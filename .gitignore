@@ -10,7 +10,6 @@ ENV/
 build/
 develop-eggs/
 dist/
-downloads/
 eggs/
 .eggs/
 lib/
@@ -48,3 +47,7 @@ node_modules/
 # Temporary files
 tmp/
 *.tmp
+
+# CodeQL
+_codeql_detected_source_root
+

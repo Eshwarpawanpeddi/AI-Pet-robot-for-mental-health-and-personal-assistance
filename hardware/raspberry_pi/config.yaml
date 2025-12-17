@@ -42,7 +42,7 @@ sensors:
   
 # Server Connection
 server:
-  host: "192.168.1.100"  # Laptop server IP
+  host: "192.168.1.100"  # TODO: Update this to your laptop server IP address
   port: 8000
   websocket_path: "/ws/control"
 
