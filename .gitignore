@@ -22,6 +22,9 @@ wheels/
 .installed.cfg
 *.egg
 
+# But don't ignore Flutter lib directory
+!mobile_app/lib/
+
 # Environment variables
 .env
 .env.local
