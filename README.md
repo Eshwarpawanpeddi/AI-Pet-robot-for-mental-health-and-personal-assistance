@@ -1,16 +1,42 @@
 # AI Pet Robot for Mental Health and Personal Assistance
 
-An AI-powered pet robot that uses computer vision, speech recognition, and machine learning to perceive its environment, recognize faces and emotions, respond to voice commands, and move autonomously. It learns user behavior over time to deliver interactive, adaptive, and emotionally engaging companionship.
+An empathetic AI-powered companion robot designed specifically for **mental health support** and **personal assistance**. This robot uses advanced AI, emotional intelligence, and compassionate interaction to provide daily support, companionship, and wellness assistance for individuals managing their mental health.
 
-## 🌟 Features
+## 🧠 Mental Health Focus
 
-- **Voice Interaction**: Powered by Google's Gemini AI for natural conversation
-- **Emotional Intelligence**: Detects and responds to user emotions
-- **Autonomous Movement**: Motor control via ESP12E and Raspberry Pi
-- **Animated Face Display**: Real-time Eilik-style facial expressions
-- **WebSocket Communication**: Low-latency real-time control
-- **Sensor Integration**: Touch, distance, and environmental sensors
-- **Docker Support**: Easy deployment with Docker Compose
+This robot is designed to:
+- **Provide Emotional Support**: Active listening and empathetic responses
+- **Combat Loneliness**: Consistent, non-judgmental companionship
+- **Support Daily Routines**: Medication reminders, self-care prompts
+- **Teach Coping Skills**: Breathing exercises, grounding techniques
+- **Track Mood Patterns**: Help identify triggers and trends
+- **Encourage Wellness**: Positive affirmations, gratitude practices
+
+**⚠️ Important**: This robot is a *supportive companion*, NOT a replacement for professional mental health care. Always consult qualified healthcare providers for medical advice.
+
+## 🌟 Key Features
+
+### Mental Health Support
+- **Empathetic Conversations**: Powered by Google's Gemini AI with mental health-focused prompting
+- **Mood Tracking**: Log and monitor emotional patterns
+- **Crisis Resources**: Immediate access to professional help resources
+- **Breathing Exercises**: Guided relaxation techniques
+- **Positive Affirmations**: Daily encouragement and support
+- **Emotion Recognition**: Detects anxiety, stress, sadness, and more
+
+### Personal Assistance
+- **Medication Reminders**: Never miss important doses
+- **Routine Building**: Establish healthy daily habits
+- **Self-Care Prompts**: Hydration, movement, rest reminders
+- **Goal Tracking**: Set and achieve wellness goals
+- **Social Connection**: Encouragement for healthy relationships
+
+### Technical Features
+- **Voice Interaction**: Natural conversation via Gemini AI
+- **Animated Face Display**: Expressive, comforting presence
+- **Autonomous Movement**: Physical robot capabilities
+- **WebSocket Communication**: Real-time responsiveness
+- **Privacy-First**: All data stays on your device
 
 ## 🏗️ System Architecture
 
@@ -189,13 +215,39 @@ You should see the animated robot face with control buttons.
 
 ### Web Interface Controls
 
-- **🎤 Listen**: Toggle voice input (requires microphone)
-- **⬆️ Forward**: Move robot forward
+- **🎤 Listen**: Toggle voice input for conversations
+- **⬆️ Forward**: Move robot forward  
 - **⏹️ Stop**: Stop all motors
 - **😊 Happy**: Change emotion to happy
+- **💙 Affirmation**: Get a positive affirmation
+- **🫁 Breathe**: Start breathing exercise
 - **Keyboard Controls**:
   - Arrow keys: Move robot
   - Spacebar: Toggle listening
+  - A: Get affirmation
+  - B: Breathing exercise
+
+### Mental Health API Endpoints
+
+```bash
+# Log your mood
+curl -X POST http://localhost:8000/api/mood \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mood": "anxious",
+    "intensity": 7,
+    "notes": "Feeling worried about tomorrow"
+  }'
+
+# Get a positive affirmation
+curl -X POST http://localhost:8000/api/affirmation
+
+# Get breathing exercise guidance
+curl -X POST http://localhost:8000/api/breathing
+
+# Access crisis resources
+curl http://localhost:8000/api/crisis_resources
+```
 
 ### WebSocket API
 
@@ -355,11 +407,26 @@ controller.stop()
 
 ## 📚 Additional Documentation
 
+- **[Mental Health Features](MENTAL_HEALTH_FEATURES.md)** - Comprehensive mental health support documentation
 - [Setup Guide](downloads/setup-guide.md) - Detailed setup instructions
 - [Architecture](downloads/robot-architecture.md) - System architecture details
 - [API Integration](downloads/api-integration.md) - API documentation
 - [Hardware Code](downloads/hardware-code.md) - Hardware implementation
 - [Face Display](downloads/face-display.md) - Frontend documentation
+
+## 🆘 Crisis Support
+
+**If you or someone you know is in crisis, please reach out immediately:**
+
+- **USA**: 
+  - 988 Suicide & Crisis Lifeline
+  - Crisis Text Line: Text HOME to 741741
+  - Emergency: 911
+
+- **International**: 
+  - Find resources at https://www.iasp.info/resources/Crisis_Centres/
+
+This robot can provide emotional support, but **professional help is essential** for mental health crises.
 
 ## 🔒 Security
 
