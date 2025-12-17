@@ -1,0 +1,47 @@
+# Mental Health Support Parameters
+
+# Mood tracking
+mood_tracking:
+  enabled: true
+  log_to_file: true
+  log_path: "/tmp/pet_robot_mood_logs.txt"
+
+# Affirmation settings
+affirmations:
+  random_selection: true
+  daily_limit: 10
+  
+# Breathing exercises
+breathing_exercises:
+  box_breathing:
+    duration: 64  # seconds (4 cycles * 16 seconds)
+    in_duration: 4
+    hold_duration: 4
+    out_duration: 4
+  
+  deep_breathing:
+    duration: 30
+    in_duration: 5
+    out_duration: 5
+
+# Crisis detection
+crisis_detection:
+  enabled: true
+  keywords:
+    - "want to kill myself"
+    - "going to kill myself"
+    - "want to end it all"
+    - "no reason to live"
+  
+  emergency_contacts:
+    usa:
+      suicide_prevention: "988"
+      crisis_text: "Text HOME to 741741"
+    international:
+      url: "https://www.iasp.info/resources/Crisis_Centres/"
+
+# Privacy settings
+privacy:
+  data_retention_days: 90
+  anonymize_logs: false
+  user_consent_required: true

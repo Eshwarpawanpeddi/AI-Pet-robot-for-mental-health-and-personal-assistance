@@ -1,0 +1,5 @@
+# Request a positive affirmation
+---
+# Response
+string affirmation
+time timestamp

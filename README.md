@@ -36,6 +36,7 @@ This robot is designed to:
 - **Animated Face Display**: Expressive, comforting presence
 - **Autonomous Movement**: Physical robot capabilities
 - **WebSocket Communication**: Real-time responsiveness
+- **ROS Integration**: Full Robot Operating System support
 - **Privacy-First**: All data stays on your device
 
 ## 🏗️ System Architecture
@@ -123,9 +124,12 @@ I2C│           │GPIO/PWM
 - Python 3.9+
 - Docker and Docker Compose (for server)
 - Arduino IDE (for ESP12E programming)
+- ROS Noetic (Ubuntu 20.04) or ROS Melodic (Ubuntu 18.04) - **Optional for ROS integration**
 - Node.js 18+ (optional, for mobile app)
 
 ## 🚀 Quick Start
+
+### Option 1: Standard Setup (FastAPI Server)
 
 ### 1. Clone the Repository
 
@@ -210,6 +214,56 @@ http://localhost:8000
 ```
 
 You should see the animated robot face with control buttons.
+
+### Option 2: ROS Integration Setup
+
+For advanced robotics features and ROS ecosystem integration:
+
+#### 1. Install ROS
+
+```bash
+# Ubuntu 20.04 (ROS Noetic)
+sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
+sudo apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
+sudo apt update
+sudo apt install ros-noetic-desktop-full
+source /opt/ros/noetic/setup.bash
+```
+
+#### 2. Build ROS Workspace
+
+```bash
+cd ros_workspace
+catkin_make
+source devel/setup.bash
+```
+
+#### 3. Launch ROS Nodes
+
+```bash
+# Launch all robot nodes
+roslaunch pet_robot_ros pet_robot.launch
+
+# Or launch only mental health features
+roslaunch pet_robot_ros mental_health.launch
+```
+
+#### 4. Test ROS Integration
+
+```bash
+# Get an affirmation
+rosservice call /mental_health/get_affirmation "{}"
+
+# Log mood
+rosservice call /mental_health/log_mood "mood: 'happy'
+intensity: 8
+notes: 'Feeling great today!'"
+
+# Control robot movement
+rostopic pub /cmd_vel geometry_msgs/Twist "linear: {x: 0.5}"
+```
+
+**📚 Full ROS Documentation**: See [ros_workspace/src/pet_robot_ros/README.md](ros_workspace/src/pet_robot_ros/README.md)
 
 ## 🎮 Usage
 
@@ -308,6 +362,16 @@ AI-Pet-robot-for-mental-health-and-personal-assistance/
 │   └── esp12e/                # ESP12E firmware
 │       ├── motor_controller.ino
 │       └── config.h           # Pin definitions
+├── ros_workspace/              # ROS Integration (NEW)
+│   └── src/
+│       └── pet_robot_ros/     # ROS package
+│           ├── msg/           # Custom messages
+│           ├── srv/           # Service definitions
+│           ├── action/        # Action definitions
+│           ├── nodes/         # ROS nodes
+│           ├── launch/        # Launch files
+│           ├── config/        # ROS configuration
+│           └── README.md      # ROS documentation
 ├── downloads/                  # Documentation
 │   ├── setup-guide.md
 │   ├── robot-architecture.md

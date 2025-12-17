@@ -1,0 +1,7 @@
+# Request to set robot's emotion
+string emotion  # happy, sad, anxious, stressed, tired, angry, neutral
+float32 intensity  # 0.0 to 1.0
+---
+# Response
+bool success
+string message
