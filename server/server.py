@@ -1,14 +1,20 @@
 from fastapi import FastAPI, WebSocket, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 import asyncio
 import json
 import logging
+import os
 from typing import Dict, List, Optional
 from datetime import datetime
+from dotenv import load_dotenv
 import google.generativeai as genai
 from google.generativeai.types import LiveConnectorConfig
 import uvicorn
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI(title="Pet Robot Server", version="1.0.0")
 
@@ -22,12 +28,19 @@ app.add_middleware(
 )
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+log_level = os.getenv("LOG_LEVEL", "INFO")
+logging.basicConfig(
+    level=getattr(logging, log_level),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # Gemini API Configuration
-GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"
-genai.configure(api_key=GEMINI_API_KEY)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    logger.warning("GEMINI_API_KEY not set. Gemini API features will be disabled.")
+else:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 class RobotState:
     """Global robot state management"""
@@ -58,19 +71,26 @@ async def shutdown():
 
 async def initialize_gemini():
     """Initialize Gemini Live API connection"""
+    if not GEMINI_API_KEY:
+        logger.warning("Skipping Gemini initialization: API key not set")
+        return
+    
     try:
         model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash-native-audio-preview-12-2025",
+            model_name="gemini-2.0-flash-exp",
             system_instruction="You are a friendly, emotionally intelligent pet robot. Keep responses concise and engaging. Express emotions through your speech patterns.",
             generation_config={
-                'response_modalities': ['audio'],
-                'realtime_input_config': {'automatic_activity_detection': {'disabled': False}}
+                'temperature': 0.9,
+                'top_p': 1.0,
+                'top_k': 40,
+                'max_output_tokens': 200,
             }
         )
         robot_state.gemini_session = model
-        logger.info("Gemini Live API initialized")
+        logger.info("Gemini API initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize Gemini: {e}")
+        robot_state.gemini_session = None
 
 @app.websocket("/ws/control")
 async def websocket_control(websocket: WebSocket):
@@ -220,8 +240,17 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "robot_state": get_robot_state()
+        "robot_state": get_robot_state(),
+        "gemini_initialized": robot_state.gemini_session is not None
     }
+
+@app.get("/")
+async def read_root():
+    """Serve the face display HTML"""
+    frontend_path = os.path.join(os.path.dirname(__file__), "../frontend/face_display.html")
+    if os.path.exists(frontend_path):
+        return FileResponse(frontend_path)
+    return {"message": "AI Pet Robot Server is running. Access /health for status."}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
