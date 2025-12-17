@@ -37,6 +37,7 @@ This robot is designed to:
 - **Autonomous Movement**: Physical robot capabilities
 - **WebSocket Communication**: Real-time responsiveness
 - **ROS Integration**: Full Robot Operating System support
+- **Mobile App**: Android/iOS app for remote control (Flutter)
 - **Privacy-First**: All data stays on your device
 
 ## 🏗️ System Architecture
@@ -265,6 +266,53 @@ rostopic pub /cmd_vel geometry_msgs/Twist "linear: {x: 0.5}"
 
 **📚 Full ROS Documentation**: See [ros_workspace/src/pet_robot_ros/README.md](ros_workspace/src/pet_robot_ros/README.md)
 
+### Option 3: Mobile App Setup (Android/iOS)
+
+Control the robot from your smartphone with the Flutter mobile app:
+
+#### 1. Install Flutter
+
+```bash
+git clone https://github.com/flutter/flutter.git -b stable
+export PATH="$PATH:`pwd`/flutter/bin"
+flutter doctor
+```
+
+#### 2. Setup Mobile App
+
+```bash
+cd mobile_app
+flutter pub get
+```
+
+#### 3. Configure Server Connection
+
+Edit `lib/config/app_config.dart` or use the app's Settings screen to set your server IP.
+
+#### 4. Run the App
+
+```bash
+# Run on connected Android device
+flutter run
+
+# Build APK for Android
+flutter build apk
+
+# For iOS (requires macOS)
+flutter build ios
+```
+
+**Features:**
+- Real-time robot control via joystick
+- Mood tracking and logging
+- Positive affirmations
+- Breathing exercises
+- Crisis resources
+- Animated robot face display
+- WebSocket connection status
+
+**📱 Full Mobile App Documentation**: See [mobile_app/README.md](mobile_app/README.md)
+
 ## 🎮 Usage
 
 ### Web Interface Controls
@@ -362,7 +410,20 @@ AI-Pet-robot-for-mental-health-and-personal-assistance/
 │   └── esp12e/                # ESP12E firmware
 │       ├── motor_controller.ino
 │       └── config.h           # Pin definitions
-├── ros_workspace/              # ROS Integration (NEW)
+├── mobile_app/                 # Mobile App (Flutter) (NEW)
+│   ├── lib/
+│   │   ├── main.dart          # App entry point
+│   │   ├── config/            # Configuration
+│   │   ├── models/            # Data models
+│   │   ├── services/          # WebSocket & API services
+│   │   ├── providers/         # State management
+│   │   ├── screens/           # UI screens
+│   │   └── widgets/           # Reusable widgets
+│   ├── android/               # Android configuration
+│   ├── ios/                   # iOS configuration
+│   ├── pubspec.yaml          # Flutter dependencies
+│   └── README.md             # Mobile app docs
+├── ros_workspace/              # ROS Integration
 │   └── src/
 │       └── pet_robot_ros/     # ROS package
 │           ├── msg/           # Custom messages
