@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Launch all pet robot ROS nodes -->
+  
+  <!-- Arguments -->
+  <arg name="use_hardware" default="true" doc="Use actual hardware or simulation"/>
+  <arg name="log_level" default="info" doc="Logging level: debug, info, warn, error"/>
+  
+  <!-- Robot Controller Node -->
+  <node name="robot_controller" pkg="pet_robot_ros" type="robot_controller_node.py" output="screen">
+    <param name="use_hardware" value="$(arg use_hardware)"/>
+  </node>
+  
+  <!-- Mental Health Support Node -->
+  <node name="mental_health" pkg="pet_robot_ros" type="mental_health_node.py" output="screen"/>
+  
+  <!-- Emotion Processing Node -->
+  <node name="emotion_processor" pkg="pet_robot_ros" type="emotion_node.py" output="screen"/>
+  
+  <!-- Load robot configuration -->
+  <rosparam command="load" file="$(find pet_robot_ros)/config/robot_params.yaml"/>
+  
+  <!-- RViz for visualization (optional) -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find pet_robot_ros)/config/pet_robot.rviz" if="false"/>
+  
+</launch>

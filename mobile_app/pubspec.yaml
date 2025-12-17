@@ -1,0 +1,56 @@
+name: pet_robot_app
+description: AI Pet Robot companion app for mental health support and personal assistance
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # UI & Material Design
+  cupertino_icons: ^1.0.2
+  google_fonts: ^6.1.0
+  
+  # State Management
+  provider: ^6.1.1
+  
+  # Network & WebSocket
+  web_socket_channel: ^2.4.0
+  http: ^1.1.2
+  
+  # Storage
+  shared_preferences: ^2.2.2
+  
+  # Animations
+  lottie: ^2.7.0
+  animated_text_kit: ^4.2.2
+  
+  # Audio
+  just_audio: ^0.9.36
+  audioplayers: ^5.2.1
+  
+  # Permissions
+  permission_handler: ^11.1.0
+  
+  # Speech
+  speech_to_text: ^6.5.1
+  flutter_tts: ^3.8.5
+  
+  # Icons & UI
+  flutter_svg: ^2.0.9
+  
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/animations/
+    - assets/icons/

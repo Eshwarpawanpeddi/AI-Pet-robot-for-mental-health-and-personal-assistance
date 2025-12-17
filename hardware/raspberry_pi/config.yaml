@@ -1,0 +1,52 @@
+# Raspberry Pi Hardware Configuration
+
+# I2C Configuration
+i2c:
+  bus: 1
+  esp12e_address: 0x08
+
+# GPIO Pin Definitions
+gpio:
+  motor:
+    enable_a: 17
+    enable_b: 27
+    direction_a1: 22
+    direction_a2: 23
+    direction_b1: 24
+    direction_b2: 25
+  
+  touch_sensor: 26
+  
+  spi:
+    ce: 8
+    mosi: 10
+    miso: 9
+    clk: 11
+  
+  i2s:
+    bck: 18
+    lrck: 13
+    data: 12
+
+# Motor Configuration
+motor:
+  pwm_frequency: 100  # Hz
+  default_speed: 200  # 0-255
+
+# Sensor Configuration
+sensors:
+  touch:
+    debounce_ms: 200
+  distance:
+    update_interval_ms: 100
+  
+# Server Connection
+server:
+  host: "192.168.1.100"  # TODO: Update this to your laptop server IP address
+  port: 8000
+  websocket_path: "/ws/control"
+
+# Logging
+logging:
+  level: "INFO"
+  file: "/var/log/robot-controller.log"

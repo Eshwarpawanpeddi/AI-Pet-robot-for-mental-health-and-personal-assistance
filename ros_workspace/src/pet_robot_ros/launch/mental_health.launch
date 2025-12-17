@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Launch only mental health support nodes -->
+  
+  <!-- Mental Health Support Node -->
+  <node name="mental_health" pkg="pet_robot_ros" type="mental_health_node.py" output="screen"/>
+  
+  <!-- Load mental health configuration -->
+  <rosparam command="load" file="$(find pet_robot_ros)/config/mental_health_params.yaml"/>
+  
+</launch>

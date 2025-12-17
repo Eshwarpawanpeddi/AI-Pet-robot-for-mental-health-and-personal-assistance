@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  robot-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - RASPBERRY_PI_IP=${RASPBERRY_PI_IP:-192.168.1.100}
+    volumes:
+      - ./server:/app
+      - ./frontend:/app/frontend
+    restart: unless-stopped
+    networks:
+      - robot-network
+
+networks:
+  robot-network:
+    driver: bridge
+

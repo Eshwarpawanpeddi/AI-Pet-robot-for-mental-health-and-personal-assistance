@@ -1,0 +1,42 @@
+# Robot Parameters for ROS
+
+# Robot Physical Parameters
+robot:
+  name: "AI_Pet_Robot"
+  type: "mental_health_companion"
+  
+  # Motor parameters
+  motor:
+    max_speed: 255
+    default_speed: 200
+    acceleration: 50
+    
+  # Sensor parameters
+  sensors:
+    touch:
+      enabled: true
+      debounce_ms: 200
+    distance:
+      enabled: true
+      max_range: 400  # cm
+      update_rate: 10  # Hz
+    temperature:
+      enabled: true
+      update_rate: 1  # Hz
+
+# Communication parameters
+communication:
+  i2c:
+    bus: 1
+    esp12e_address: 0x08
+  
+  server:
+    host: "192.168.1.100"
+    port: 8000
+    websocket_path: "/ws/control"
+
+# Safety parameters
+safety:
+  max_velocity: 1.0  # m/s
+  emergency_stop_distance: 10  # cm
+  battery_warning_level: 20  # percent

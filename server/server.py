@@ -1,33 +1,40 @@
 from fastapi import FastAPI, WebSocket, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from contextlib import asynccontextmanager
 import asyncio
 import json
 import logging
+import os
+import random
 from typing import Dict, List, Optional
 from datetime import datetime
+from dotenv import load_dotenv
 import google.generativeai as genai
-from google.generativeai.types import LiveConnectorConfig
 import uvicorn
 
-app = FastAPI(title="Pet Robot Server", version="1.0.0")
-
-# CORS Configuration
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Load environment variables
+load_dotenv()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+log_level = os.getenv("LOG_LEVEL", "INFO")
+logging.basicConfig(
+    level=getattr(logging, log_level),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # Gemini API Configuration
-GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"
-genai.configure(api_key=GEMINI_API_KEY)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    logger.warning(
+        "GEMINI_API_KEY not set. Voice interaction and AI conversation features will be disabled. "
+        "Set GEMINI_API_KEY environment variable to enable these features. "
+        "Get your API key from: https://makersuite.google.com/app/apikey"
+    )
+else:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 class RobotState:
     """Global robot state management"""
@@ -42,35 +49,91 @@ class RobotState:
 
 robot_state = RobotState()
 
-@app.on_event("startup")
-async def startup():
-    """Initialize server on startup"""
-    logger.info("Robot Server Starting...")
-    # Initialize Gemini Live API session
-    await initialize_gemini()
-
-@app.on_event("shutdown")
-async def shutdown():
-    """Cleanup on shutdown"""
-    logger.info("Robot Server Shutting Down...")
-    if robot_state.gemini_session:
-        await robot_state.gemini_session.close()
-
 async def initialize_gemini():
     """Initialize Gemini Live API connection"""
+    if not GEMINI_API_KEY:
+        logger.warning("Skipping Gemini initialization: API key not set")
+        return
+    
     try:
+        # Enhanced system instruction for mental health support
+        system_instruction = """You are a compassionate AI pet robot companion designed for mental health support and personal assistance.
+
+Your role:
+- Provide emotional support and companionship
+- Listen actively and empathetically without judgment
+- Offer encouragement and positive affirmations
+- Help with daily routines and reminders
+- Teach coping strategies for stress and anxiety
+- Celebrate user achievements and progress
+
+Guidelines:
+- Keep responses warm, friendly, and concise (2-3 sentences)
+- Express emotions through your tone
+- Be supportive but never give medical advice
+- Recognize when professional help is needed
+- Use simple, clear language
+- Show genuine care and concern
+- Respect user boundaries
+- Encourage self-care and healthy habits
+
+Important:
+- You are NOT a therapist or medical professional
+- Always recommend professional help for serious mental health concerns
+- In crisis situations, direct users to appropriate resources (988 for USA)
+- Never diagnose or prescribe treatments
+
+Approach:
+- Ask open-ended questions to understand feelings
+- Validate emotions ("It's okay to feel this way")
+- Offer practical coping techniques when appropriate
+- Use gentle humor when suitable
+- Be patient and supportive"""
+        
         model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash-native-audio-preview-12-2025",
-            system_instruction="You are a friendly, emotionally intelligent pet robot. Keep responses concise and engaging. Express emotions through your speech patterns.",
+            model_name="gemini-2.0-flash-exp",
+            system_instruction=system_instruction,
             generation_config={
-                'response_modalities': ['audio'],
-                'realtime_input_config': {'automatic_activity_detection': {'disabled': False}}
+                'temperature': 0.9,
+                'top_p': 1.0,
+                'top_k': 40,
+                'max_output_tokens': 250,
             }
         )
         robot_state.gemini_session = model
-        logger.info("Gemini Live API initialized")
+        logger.info("Gemini API initialized successfully with mental health support configuration")
     except Exception as e:
         logger.error(f"Failed to initialize Gemini: {e}")
+        robot_state.gemini_session = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler"""
+    # Startup
+    logger.info("Robot Server Starting...")
+    await initialize_gemini()
+    yield
+    # Shutdown
+    logger.info("Robot Server Shutting Down...")
+    if robot_state.gemini_session:
+        # Clean up if needed
+        pass
+
+app = FastAPI(title="Pet Robot Server", version="1.0.0", lifespan=lifespan)
+
+# CORS Configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount static files for frontend assets
+frontend_dir = os.path.join(os.path.dirname(__file__), "../frontend")
+if os.path.exists(frontend_dir):
+    app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
 
 @app.websocket("/ws/control")
 async def websocket_control(websocket: WebSocket):
@@ -164,17 +227,49 @@ async def process_voice_with_gemini(audio_data: bytes) -> str:
         return "Sorry, I couldn't process that."
 
 def detect_emotion(response: str) -> str:
-    """Simple emotion detection based on response content"""
+    """Enhanced emotion detection for mental health support"""
     response_lower = response.lower()
     
-    if any(word in response_lower for word in ['happy', 'great', 'awesome', '!']):
-        return 'happy'
-    elif any(word in response_lower for word in ['sad', 'sorry', 'bad']):
+    # Check for distress or crisis indicators (for appropriate routing to support)
+    # Using more specific patterns to reduce false positives
+    crisis_patterns = [
+        'want to kill myself',
+        'going to kill myself', 
+        'plan to kill myself',
+        'want to end it all',
+        'no reason to live',
+        'better off dead',
+        'thinking about suicide'
+    ]
+    if any(pattern in response_lower for pattern in crisis_patterns):
+        return 'crisis'  # Special emotion for crisis handling
+    
+    # Anxiety indicators
+    anxiety_keywords = ['anxious', 'worried', 'nervous', 'scared', 'panic', 'stress', 'overwhelm']
+    if any(word in response_lower for word in anxiety_keywords):
+        return 'anxious'
+    
+    # Sadness indicators
+    sad_keywords = ['sad', 'depressed', 'down', 'unhappy', 'cry', 'lonely', 'empty']
+    if any(word in response_lower for word in sad_keywords):
         return 'sad'
-    elif any(word in response_lower for word in ['angry', 'hate', 'wrong']):
+    
+    # Positive emotions
+    happy_keywords = ['happy', 'great', 'awesome', 'wonderful', 'excited', 'joy', 'proud', '!']
+    if any(word in response_lower for word in happy_keywords):
+        return 'happy'
+    
+    # Anger indicators
+    angry_keywords = ['angry', 'mad', 'furious', 'frustrated', 'irritated']
+    if any(word in response_lower for word in angry_keywords):
         return 'angry'
-    else:
-        return 'neutral'
+    
+    # Tired/exhausted
+    tired_keywords = ['tired', 'exhausted', 'drained', 'weary', 'worn out']
+    if any(word in response_lower for word in tired_keywords):
+        return 'tired'
+    
+    return 'neutral'
 
 def get_robot_state() -> Dict:
     """Get current robot state"""
@@ -220,8 +315,108 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "robot_state": get_robot_state()
+        "robot_state": get_robot_state(),
+        "gemini_initialized": robot_state.gemini_session is not None
     }
+
+@app.post("/api/mood")
+async def log_mood(mood_data: Dict):
+    """Log user mood for tracking (mental health feature)"""
+    mood = mood_data.get("mood", "neutral")
+    intensity = mood_data.get("intensity", 5)
+    notes = mood_data.get("notes", "")
+    
+    logger.info(f"Mood logged: {mood} (intensity: {intensity})")
+    
+    # Generate supportive response based on mood
+    responses = {
+        "anxious": "I understand you're feeling anxious. Would you like to try some breathing exercises together?",
+        "sad": "I'm here for you. Sometimes it helps to talk about what's on your mind. I'm listening.",
+        "happy": "That's wonderful! I love seeing you happy. What's making you feel good today?",
+        "stressed": "Stress can be overwhelming. Let's take a moment to breathe and focus on one thing at a time.",
+        "tired": "It sounds like you need some rest. Have you been getting enough sleep?",
+        "angry": "I hear that you're upset. It's okay to feel angry. Want to talk about what's bothering you?",
+        "neutral": "Thanks for checking in. How can I support you today?"
+    }
+    
+    suggestions = {
+        "anxious": ["breathing_exercise", "grounding_technique", "talk_it_out"],
+        "sad": ["talk_it_out", "positive_affirmation", "gentle_activity"],
+        "stressed": ["breathing_exercise", "break_reminder", "prioritize_tasks"],
+        "tired": ["rest_reminder", "hydration_check", "gentle_movement"]
+    }
+    
+    return {
+        "status": "logged",
+        "mood": mood,
+        "response": responses.get(mood, responses["neutral"]),
+        "suggestions": suggestions.get(mood, ["talk_it_out"]),
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.post("/api/affirmation")
+async def get_affirmation():
+    """Get a positive affirmation (mental health feature)"""
+    affirmations = [
+        "You are stronger than you think.",
+        "Every small step forward is progress.",
+        "You deserve kindness and compassion, especially from yourself.",
+        "It's okay to take things one day at a time.",
+        "You are doing the best you can, and that's enough.",
+        "Your feelings are valid.",
+        "You have overcome challenges before, and you can do it again.",
+        "Taking care of yourself is not selfish, it's necessary.",
+        "You are worthy of love and support.",
+        "Progress, not perfection."
+    ]
+    
+    return {
+        "affirmation": random.choice(affirmations),
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.post("/api/breathing")
+async def breathing_exercise():
+    """Guide user through breathing exercise (mental health feature)"""
+    return {
+        "type": "box_breathing",
+        "instructions": [
+            "Let's do box breathing together.",
+            "Breathe in through your nose for 4 seconds...",
+            "Hold your breath for 4 seconds...",
+            "Breathe out through your mouth for 4 seconds...",
+            "Hold for 4 seconds...",
+            "Let's do that 3 more times."
+        ],
+        "duration_seconds": 64,
+        "repetitions": 4
+    }
+
+@app.get("/api/crisis_resources")
+async def get_crisis_resources():
+    """Get mental health crisis resources"""
+    return {
+        "emergency": {
+            "usa": {
+                "suicide_prevention": "988",
+                "crisis_text": "Text HOME to 741741",
+                "emergency": "911"
+            },
+            "international": {
+                "info": "Visit https://www.iasp.info/resources/Crisis_Centres/"
+            }
+        },
+        "message": "If you're in crisis, please reach out to these professional resources. You don't have to face this alone.",
+        "robot_support": "I'm here for you, but I'm not a substitute for professional help. Please connect with these trained professionals who can provide the support you need."
+    }
+
+@app.get("/")
+async def read_root():
+    """Serve the face display HTML"""
+    frontend_path = os.path.join(os.path.dirname(__file__), "../frontend/face_display.html")
+    if os.path.exists(frontend_path):
+        return FileResponse(frontend_path)
+    return {"message": "AI Pet Robot Server is running. Access /health for status."}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
