@@ -2,6 +2,7 @@ from fastapi import FastAPI, WebSocket, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from contextlib import asynccontextmanager
 import asyncio
 import json
 import logging
@@ -10,22 +11,10 @@ from typing import Dict, List, Optional
 from datetime import datetime
 from dotenv import load_dotenv
 import google.generativeai as genai
-from google.generativeai.types import LiveConnectorConfig
 import uvicorn
 
 # Load environment variables
 load_dotenv()
-
-app = FastAPI(title="Pet Robot Server", version="1.0.0")
-
-# CORS Configuration
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Configure logging
 log_level = os.getenv("LOG_LEVEL", "INFO")
@@ -55,20 +44,6 @@ class RobotState:
 
 robot_state = RobotState()
 
-@app.on_event("startup")
-async def startup():
-    """Initialize server on startup"""
-    logger.info("Robot Server Starting...")
-    # Initialize Gemini Live API session
-    await initialize_gemini()
-
-@app.on_event("shutdown")
-async def shutdown():
-    """Cleanup on shutdown"""
-    logger.info("Robot Server Shutting Down...")
-    if robot_state.gemini_session:
-        await robot_state.gemini_session.close()
-
 async def initialize_gemini():
     """Initialize Gemini Live API connection"""
     if not GEMINI_API_KEY:
@@ -91,6 +66,30 @@ async def initialize_gemini():
     except Exception as e:
         logger.error(f"Failed to initialize Gemini: {e}")
         robot_state.gemini_session = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler"""
+    # Startup
+    logger.info("Robot Server Starting...")
+    await initialize_gemini()
+    yield
+    # Shutdown
+    logger.info("Robot Server Shutting Down...")
+    if robot_state.gemini_session:
+        # Clean up if needed
+        pass
+
+app = FastAPI(title="Pet Robot Server", version="1.0.0", lifespan=lifespan)
+
+# CORS Configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.websocket("/ws/control")
 async def websocket_control(websocket: WebSocket):
