@@ -1,5 +1,17 @@
 # Security Policy
 
+## Security Updates
+
+### Latest Security Patches
+
+**December 2024**
+- Updated `fastapi` from 0.109.0 to 0.109.1 (fixes Content-Type Header ReDoS vulnerability)
+- Updated `python-multipart` from 0.0.6 to 0.0.18 (fixes multiple vulnerabilities):
+  - DoS via deformation multipart/form-data boundary
+  - Content-Type Header ReDoS
+
+All dependencies are now on patched versions with no known vulnerabilities.
+
 ## Supported Versions
 
 This project is currently in active development. Security updates will be applied to the main branch.
