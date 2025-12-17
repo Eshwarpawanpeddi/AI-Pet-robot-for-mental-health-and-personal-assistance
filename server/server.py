@@ -7,6 +7,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 from typing import Dict, List, Optional
 from datetime import datetime
 from dotenv import load_dotenv
@@ -27,7 +28,11 @@ logger = logging.getLogger(__name__)
 # Gemini API Configuration
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
-    logger.warning("GEMINI_API_KEY not set. Gemini API features will be disabled.")
+    logger.warning(
+        "GEMINI_API_KEY not set. Voice interaction and AI conversation features will be disabled. "
+        "Set GEMINI_API_KEY environment variable to enable these features. "
+        "Get your API key from: https://makersuite.google.com/app/apikey"
+    )
 else:
     genai.configure(api_key=GEMINI_API_KEY)
 
@@ -226,8 +231,17 @@ def detect_emotion(response: str) -> str:
     response_lower = response.lower()
     
     # Check for distress or crisis indicators (for appropriate routing to support)
-    crisis_keywords = ['suicide', 'kill myself', 'end it all', 'no reason to live', 'better off dead']
-    if any(word in response_lower for word in crisis_keywords):
+    # Using more specific patterns to reduce false positives
+    crisis_patterns = [
+        'want to kill myself',
+        'going to kill myself', 
+        'plan to kill myself',
+        'want to end it all',
+        'no reason to live',
+        'better off dead',
+        'thinking about suicide'
+    ]
+    if any(pattern in response_lower for pattern in crisis_patterns):
         return 'crisis'  # Special emotion for crisis handling
     
     # Anxiety indicators
@@ -356,7 +370,6 @@ async def get_affirmation():
         "Progress, not perfection."
     ]
     
-    import random
     return {
         "affirmation": random.choice(affirmations),
         "timestamp": datetime.now().isoformat()
