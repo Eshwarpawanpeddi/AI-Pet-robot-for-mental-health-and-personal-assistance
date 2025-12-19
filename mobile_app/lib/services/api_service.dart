@@ -106,4 +106,42 @@ class ApiService {
       rethrow;
     }
   }
+
+  Future<Map<String, dynamic>> setControlMode(String mode) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/mode'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'mode': mode}),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Failed to set control mode');
+      }
+    } catch (e) {
+      print('Error setting control mode: $e');
+      rethrow;
+    }
+  }
+
+  Future<String> getControlMode() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/mode'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['mode'] ?? 'manual';
+      } else {
+        throw Exception('Failed to get control mode');
+      }
+    } catch (e) {
+      print('Error getting control mode: $e');
+      rethrow;
+    }
+  }
 }

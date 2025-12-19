@@ -4,8 +4,12 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// I2C Configuration
-#define SLAVE_ADDRESS 0x08
+// Wi-Fi Configuration
+#define WIFI_SSID "YOUR_WIFI_SSID"
+#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+#define SERVER_HOST "192.168.1.100"  // Server IP address
+#define SERVER_PORT 8000
+#define WEBSOCKET_PATH "/ws/esp"
 #define BAUD_RATE 115200
 
 // Motor Control Pins (L298N Motor Driver)
@@ -36,6 +40,11 @@
 // Sensor Configuration
 #define TOUCH_DEBOUNCE_MS 50
 #define DISTANCE_TIMEOUT_US 30000  // 30ms timeout for ultrasonic sensor
+
+// Network Configuration
+#define RECONNECT_DELAY_MS 5000
+#define HEARTBEAT_INTERVAL_MS 10000
+#define COMMAND_TIMEOUT_MS 5000
 
 // Command Definitions
 #define CMD_STOP 0
