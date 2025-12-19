@@ -44,7 +44,7 @@ This robot is designed to:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     PHONE/WEB CLIENT                             │
+│                  MOBILE APP / WEB CLIENT                         │
 │  ┌──────────────┐ ┌──────────────┐ ┌─────────────────────────┐ │
 │  │ Voice Input  │ │ Manual Ctrl  │ │ Animated Face Display   │ │
 │  │ (Gemini AI)  │ │ (Joystick)   │ │ (Shows Emotions)        │ │
@@ -57,7 +57,7 @@ This robot is designed to:
          │                │                │
          ▼                ▼                ▼
 ┌──────────────────────────────────────────────┐
-│     LAPTOP SERVER (Processing Core)           │
+│     CENTRAL SERVER (Processing Core)          │
 │  ┌────────────────────────────────────────┐  │
 │  │ Gemini AI Integration                   │  │
 │  │ - Voice Processing                      │  │
@@ -65,68 +65,65 @@ This robot is designed to:
 │  │ - Emotion Detection & Synthesis         │  │
 │  └────────────────────────────────────────┘  │
 │  ┌────────────────────────────────────────┐  │
-│  │ Command Orchestration & Routing         │  │
-│  │ - Parse voice commands                  │  │
-│  │ - Generate motor commands               │  │
-│  │ - Manage face animations                │  │
+│  │ WebSocket Hub & Command Routing         │  │
+│  │ - ESP12E Motor Commands (Wi-Fi)         │  │
+│  │ - Raspberry Pi Face/Audio (Wi-Fi)       │  │
+│  │ - Mobile App Control (WebSocket)        │  │
+│  │ - Mode Toggle (Manual/Autonomous)       │  │
 │  └────────────────────────────────────────┘  │
-└──────────────────┬───────────────────────────┘
-                   │
-         I2C/MQTT  │  WebSocket
-                   │
-         ┌─────────▼─────────────────┐
-         │                           │
-         ▼                           ▼
-┌─────────────────────────────────────┐
-│   RASPBERRY PI 4 (Central Hub)      │
-│  ┌────────────────────────────────┐ │
-│  │ GPIO/I2C/SPI Management         │ │
-│  │ - Sensor data collection        │ │
-│  │ - Hardware state management     │ │
-│  │ - Command parsing               │ │
-│  └────────────────────────────────┘ │
-└──┬───────────┬─────────────────────┘
-   │           │
-I2C│           │GPIO/PWM
-   │           │
-┌──▼──┐    ┌───▼────────────┐
-│     │    │                │
-▼     ▼    ▼                ▼
-┌─────────────┐ ┌────────┐  ┌─────────┐
-│   ESP12E    │ │Display │  │ Speaker │
-│(Motor Ctrl) │ │ (LCD)  │  │(Audio)  │
-└──────┬──────┘ └────────┘  └─────────┘
-       │
-   PWM │
-       │
-┌──────▼──────────────┐
-│  L298N Motor Driver │
-└─────────┬───────────┘
-          │
-    ┌─────┴─────┬─────────┐
-    │           │         │
-    ▼           ▼         ▼
-  Motor A    Motor B   Servo(s)
+└──────────────┬───────────────────┬───────────┘
+               │                   │
+      WebSocket│                   │WebSocket
+      (Wi-Fi) │                   │(Wi-Fi)
+               │                   │
+      ┌────────▼────────┐ ┌────────▼─────────────┐
+      │                 │ │                      │
+      ▼                 │ ▼                      │
+┌─────────────────┐     │ ┌────────────────────────┐
+│   ESP12E        │     │ │   RASPBERRY PI 4       │
+│ (Motor Control) │     │ │  (Face & Audio Hub)    │
+│  ┌──────────┐   │     │ │  ┌──────────────────┐  │
+│  │ Wi-Fi    │   │     │ │  │ HDMI Face Display│  │
+│  │WebSocket │   │     │ │  │ Real-time Render │  │
+│  └──────────┘   │     │ │  └──────────────────┘  │
+│  ┌──────────┐   │     │ │  ┌──────────────────┐  │
+│  │Motor Ctrl│   │     │ │  │Audio Output      │  │
+│  │PWM+Dir   │   │     │ │  │(Audio Jack)      │  │
+│  └────┬─────┘   │     │ │  └──────────────────┘  │
+└───────┼─────────┘     │ └────────────────────────┘
+        │               │
+        │               │
+   ┌────▼──────────┐    │
+   │ L298N Driver  │    │
+   └────┬──────────┘    │
+        │               │
+   ┌────┴────┬─────┐    │
+   │         │     │    │
+   ▼         ▼     ▼    │
+Motor A   Motor B  Servo(s)
 ```
 
 ## 📋 Prerequisites
 
 ### Hardware Requirements
-- Raspberry Pi 4 (4GB+ recommended)
-- ESP12E (NodeMCU) microcontroller
-- L298N Motor Driver
-- DC Motors (2x)
-- Touch sensors
-- Ultrasonic distance sensor
-- Power supply (5V for Pi, appropriate voltage for motors)
-- Laptop/Desktop for server
+- **Central Server**: Laptop or Desktop (Linux/Windows/Mac) or Cloud Server
+- **Raspberry Pi 4** (4GB+ recommended) - For face display and audio
+- **ESP12E (NodeMCU)** microcontroller - For motor control
+- **L298N Motor Driver**
+- **DC Motors** (2x) for movement
+- **HDMI Display** connected to Raspberry Pi for face animations
+- **Speaker/Audio Output** via Raspberry Pi audio jack
+- **Wi-Fi Router** - All components must be on same network
+- **Power supplies**: 5V for Pi, appropriate voltage for motors
+- **Optional**: Touch sensors, ultrasonic distance sensor (for future expansion)
 
 ### Software Requirements
 - Python 3.9+
-- Docker and Docker Compose (for server)
+- Docker and Docker Compose (for server - optional)
 - Arduino IDE (for ESP12E programming)
-- ROS Noetic (Ubuntu 20.04) or ROS Melodic (Ubuntu 18.04) - **Optional for ROS integration**
-- Node.js 18+ (optional, for mobile app)
+- Flutter SDK (for mobile app - optional)
+- Node.js 18+ (for mobile app development - optional)
+- **ROS Noetic** (Ubuntu 20.04) or **ROS Melodic** (Ubuntu 18.04) - **Optional for autonomous mode**
 
 ## 🚀 Quick Start
 
@@ -180,18 +177,23 @@ cd hardware/raspberry_pi
 
 # Install dependencies
 sudo apt-get update
-sudo apt-get install -y python3-pip python3-smbus python3-rpi.gpio i2c-tools
-pip3 install -r requirements.txt
+sudo apt-get install -y python3-pip python3-websockets
+pip3 install websockets asyncio
 
-# Enable I2C
-sudo raspi-config nonint do_i2c 0
-
-# Update config.yaml with your server IP
-nano config.yaml
+# Update the SERVER_URL in raspberry_pi_controller.py
+# Edit the file and set SERVER_URL to your server's IP
+nano raspberry_pi_controller.py
+# Change: SERVER_URL = "ws://YOUR_SERVER_IP:8000/ws/raspberry_pi"
 
 # Run controller
 python3 raspberry_pi_controller.py
 ```
+
+**Note**: The Raspberry Pi will:
+- Connect to the central server via WebSocket
+- Render face animations on HDMI display
+- Play audio through the audio jack
+- Receive emotion updates in real-time
 
 ### 4. ESP12E Setup
 
@@ -203,9 +205,22 @@ python3 raspberry_pi_controller.py
      http://arduino.esp8266.com/stable/package_esp8266com_index.json
      ```
 3. Install ESP8266 from **Tools → Board → Boards Manager**
-4. Open `hardware/esp12e/motor_controller.ino`
-5. Select **Tools → Board → NodeMCU 1.0 (ESP-12E Module)**
-6. Upload the sketch to ESP12E
+4. Install required libraries:
+   - **WebSocketsClient** by Markus Sattler
+   - **ArduinoJson** by Benoit Blanchon
+5. Open `hardware/esp12e/motor_controller.ino`
+6. Edit `hardware/esp12e/config.h`:
+   - Set `WIFI_SSID` to your Wi-Fi network name
+   - Set `WIFI_PASSWORD` to your Wi-Fi password
+   - Set `SERVER_HOST` to your server's IP address
+7. Select **Tools → Board → NodeMCU 1.0 (ESP-12E Module)**
+8. Upload the sketch to ESP12E
+
+**Note**: The ESP12E will:
+- Connect to Wi-Fi automatically on startup
+- Establish WebSocket connection to server
+- Receive motor commands and execute them
+- Enter fallback mode (auto-stop) if connection drops
 
 ### 5. Access the Web Interface
 
@@ -510,25 +525,36 @@ controller.stop()
 - Ensure port 8000 is not in use
 - Check logs: `docker-compose logs robot-server`
 
-### ESP12E Not Responding
+### ESP12E Not Connecting
 
-- Verify I2C connection: `i2cdetect -y 1`
-- Check I2C pull-up resistors (4.7kΩ on SDA/SCL)
-- Ensure ESP12E is powered correctly
+- Verify Wi-Fi credentials in `config.h`
+- Check if ESP12E is on the same network as server
+- Verify server IP address in `config.h`
+- Check server logs for WebSocket connection attempts
+- Monitor ESP12E serial output for connection status
+
+### Raspberry Pi Not Connecting
+
+- Verify server URL in `raspberry_pi_controller.py`
+- Check network connectivity: `ping <server_ip>`
+- Ensure WebSocket port 8000 is accessible
+- Check server logs for Raspberry Pi connection attempts
 
 ### Motors Not Moving
 
-- Check motor driver connections
-- Verify GPIO pins are correctly configured
+- Check ESP12E WebSocket connection status
+- Verify motor driver (L298N) connections
 - Test motor driver with known good motors
 - Check power supply voltage and current
+- Monitor ESP12E serial output for command receipt
 
 ### WebSocket Connection Failed
 
-- Check firewall settings
-- Verify server is running
-- Check network connectivity
-- Use correct server IP address
+- Check firewall settings on server
+- Verify server is running: `curl http://<server_ip>:8000/health`
+- Ensure all devices are on same network
+- Use correct server IP address (not localhost from remote devices)
+- Check router allows WebSocket connections
 
 ## 📚 Additional Documentation
 
