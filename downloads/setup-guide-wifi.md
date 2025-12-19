@@ -146,6 +146,11 @@ curl http://localhost:8000/health
 #define SERVER_PORT 8000
 ```
 
+**Security Note**: 
+- The `config.h` file is included in `.gitignore` to prevent committing Wi-Fi credentials
+- Never commit files containing Wi-Fi passwords to public repositories
+- Consider creating `config.h` from a template file (`config.h.example`)
+
 ### Step 5: Upload to ESP12E
 
 1. Connect ESP12E to computer via USB

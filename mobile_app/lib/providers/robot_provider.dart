@@ -54,15 +54,9 @@ class RobotProvider with ChangeNotifier {
       _robotState = state;
       
       // Update connection status from state if available
-      if (state.controlMode != null) {
-        _controlMode = state.controlMode!;
-      }
-      if (state.espConnected != null) {
-        _espConnected = state.espConnected!;
-      }
-      if (state.raspberryPiConnected != null) {
-        _raspberryPiConnected = state.raspberryPiConnected!;
-      }
+      _controlMode = state.controlMode ?? _controlMode;
+      _espConnected = state.espConnected ?? _espConnected;
+      _raspberryPiConnected = state.raspberryPiConnected ?? _raspberryPiConnected;
       
       notifyListeners();
     });

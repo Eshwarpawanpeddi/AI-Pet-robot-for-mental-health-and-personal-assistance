@@ -162,7 +162,7 @@ void handleCommand(uint8_t * payload, size_t length) {
   
   if (strcmp(type, "move") == 0) {
     const char* direction = doc["direction"];
-    int speed = doc["speed"] | DEFAULT_SPEED;
+    int speed = doc.containsKey("speed") ? doc["speed"].as<int>() : DEFAULT_SPEED;
     
     lastCommandTime = millis();
     fallbackMode = false;
