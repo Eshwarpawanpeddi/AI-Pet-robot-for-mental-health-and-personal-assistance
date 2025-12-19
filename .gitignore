@@ -51,6 +51,9 @@ node_modules/
 tmp/
 *.tmp
 
+# Hardware configuration with credentials
+hardware/esp12e/config.h
+
 # CodeQL
 _codeql_detected_source_root
 

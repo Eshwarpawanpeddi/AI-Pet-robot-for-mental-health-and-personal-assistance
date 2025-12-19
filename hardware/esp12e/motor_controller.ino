@@ -1,9 +1,13 @@
-#include <Wire.h>
+#include <ESP8266WiFi.h>
+#include <WebSocketsClient.h>
 #include <ArduinoJson.h>
+#include "config.h"
 
-// I2C Configuration
-#define SLAVE_ADDRESS 0x08
-#define BAUD_RATE 115200
+WebSocketsClient webSocket;
+unsigned long lastHeartbeat = 0;
+unsigned long lastCommandTime = 0;
+bool isConnected = false;
+bool fallbackMode = false;
 
 // Motor Control Pins (L298N Motor Driver)
 #define MOTOR_A_PIN1 D0  // GPIO16
@@ -36,7 +40,6 @@ volatile MotorCommand currentCommand = {0, 0, 0};
 
 void setup() {
   Serial.begin(BAUD_RATE);
-  Wire.begin(SLAVE_ADDRESS);
   
   // Set motor pins as outputs
   pinMode(MOTOR_A_PIN1, OUTPUT);
@@ -53,28 +56,183 @@ void setup() {
   pinMode(DISTANCE_TRIG, OUTPUT);
   pinMode(DISTANCE_ECHO, INPUT);
   
-  // I2C callbacks
-  Wire.onReceive(receiveData);
-  Wire.onRequest(sendData);
-  
   Serial.println("ESP12E Motor Controller Initialized");
-  Serial.println("Waiting for I2C commands...");
   
   // Stop all motors by default
   stopAllMotors();
+  
+  // Connect to Wi-Fi
+  connectWiFi();
+  
+  // Setup WebSocket
+  webSocket.begin(SERVER_HOST, SERVER_PORT, WEBSOCKET_PATH);
+  webSocket.onEvent(webSocketEvent);
+  webSocket.setReconnectInterval(RECONNECT_DELAY_MS);
+  
+  Serial.println("WebSocket client initialized");
 }
 
 void loop() {
+  webSocket.loop();
+  
   // Check for touch sensor
   if (digitalRead(TOUCH_SENSOR_PIN) == HIGH) {
     Serial.println("Touch detected!");
-    delay(50); // Debounce
+    sendSensorData("touch", true);
+    delay(TOUCH_DEBOUNCE_MS);
+  }
+  
+  // Send heartbeat
+  if (millis() - lastHeartbeat > HEARTBEAT_INTERVAL_MS) {
+    sendHeartbeat();
+    lastHeartbeat = millis();
+  }
+  
+  // Check for command timeout and enter fallback mode
+  if (isConnected && millis() - lastCommandTime > COMMAND_TIMEOUT_MS * 2) {
+    if (!fallbackMode) {
+      Serial.println("Entering fallback mode - no commands received");
+      fallbackMode = true;
+      stopAllMotors();
+    }
   }
   
   delay(10);
 }
 
-// I2C Data Reception Handler
+// Wi-Fi Connection
+void connectWiFi() {
+  Serial.println("Connecting to WiFi...");
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nWiFi connected");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\nWiFi connection failed");
+  }
+}
+
+// WebSocket Event Handler
+void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
+  switch(type) {
+    case WStype_DISCONNECTED:
+      Serial.println("WebSocket Disconnected");
+      isConnected = false;
+      fallbackMode = true;
+      stopAllMotors();
+      break;
+      
+    case WStype_CONNECTED:
+      Serial.println("WebSocket Connected");
+      isConnected = true;
+      fallbackMode = false;
+      webSocket.sendTXT("{\"type\":\"esp_connected\",\"device\":\"ESP12E\"}");
+      break;
+      
+    case WStype_TEXT:
+      handleCommand(payload, length);
+      break;
+      
+    case WStype_ERROR:
+      Serial.println("WebSocket Error");
+      break;
+  }
+}
+
+// Handle incoming commands
+void handleCommand(uint8_t * payload, size_t length) {
+  StaticJsonDocument<200> doc;
+  DeserializationError error = deserializeJson(doc, payload, length);
+  
+  if (error) {
+    Serial.println("JSON parsing failed");
+    return;
+  }
+  
+  const char* type = doc["type"];
+  
+  if (strcmp(type, "move") == 0) {
+    const char* direction = doc["direction"];
+    int speed = doc.containsKey("speed") ? doc["speed"].as<int>() : DEFAULT_SPEED;
+    
+    lastCommandTime = millis();
+    fallbackMode = false;
+    
+    Serial.print("Move command: ");
+    Serial.print(direction);
+    Serial.print(" at speed ");
+    Serial.println(speed);
+    
+    if (strcmp(direction, "forward") == 0) {
+      moveForward(speed);
+    } else if (strcmp(direction, "backward") == 0) {
+      moveBackward(speed);
+    } else if (strcmp(direction, "left") == 0) {
+      turnLeft(speed);
+    } else if (strcmp(direction, "right") == 0) {
+      turnRight(speed);
+    } else if (strcmp(direction, "stop") == 0) {
+      stopAllMotors();
+    }
+    
+    // Send acknowledgment
+    sendStatus();
+  }
+}
+
+// Send heartbeat
+void sendHeartbeat() {
+  if (!isConnected) return;
+  
+  StaticJsonDocument<200> doc;
+  doc["type"] = "heartbeat";
+  doc["device"] = "ESP12E";
+  doc["status"] = fallbackMode ? "fallback" : "normal";
+  doc["uptime"] = millis();
+  
+  String output;
+  serializeJson(doc, output);
+  webSocket.sendTXT(output);
+}
+
+// Send sensor data
+void sendSensorData(const char* sensor, bool value) {
+  if (!isConnected) return;
+  
+  StaticJsonDocument<200> doc;
+  doc["type"] = "sensor";
+  doc["sensor"] = sensor;
+  doc["value"] = value;
+  
+  String output;
+  serializeJson(doc, output);
+  webSocket.sendTXT(output);
+}
+
+// Send status update
+void sendStatus() {
+  if (!isConnected) return;
+  
+  StaticJsonDocument<200> doc;
+  doc["type"] = "status";
+  doc["device"] = "ESP12E";
+  doc["connected"] = true;
+  
+  String output;
+  serializeJson(doc, output);
+  webSocket.sendTXT(output);
+}
+
+// I2C Data Reception Handler (Deprecated - kept for reference)
 void receiveData(int byteCount) {
   if (byteCount >= 3) {
     int motor = Wire.read();      // Motor selection
@@ -100,8 +258,6 @@ void receiveData(int byteCount) {
 void sendData() {
   Wire.write(currentCommand.direction);  // Send current state
 }
-
-// Motor Control Functions
 void executeMotorCommand(MotorCommand cmd) {
   if (cmd.direction == 0) {
     stopAllMotors();

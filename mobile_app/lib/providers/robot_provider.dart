@@ -22,6 +22,9 @@ class RobotProvider with ChangeNotifier {
   List<MoodLog> _moodLogs = [];
   String? _lastAffirmation;
   String? _errorMessage;
+  String _controlMode = 'manual'; // manual or autonomous
+  bool _espConnected = false;
+  bool _raspberryPiConnected = false;
 
   // Getters
   RobotState get robotState => _robotState;
@@ -30,6 +33,9 @@ class RobotProvider with ChangeNotifier {
   List<MoodLog> get moodLogs => _moodLogs;
   String? get lastAffirmation => _lastAffirmation;
   String? get errorMessage => _errorMessage;
+  String get controlMode => _controlMode;
+  bool get espConnected => _espConnected;
+  bool get raspberryPiConnected => _raspberryPiConnected;
 
   RobotProvider() {
     _init();
@@ -46,6 +52,12 @@ class RobotProvider with ChangeNotifier {
     // Listen to WebSocket streams
     _wsService.stateStream.listen((state) {
       _robotState = state;
+      
+      // Update connection status from state if available
+      _controlMode = state.controlMode ?? _controlMode;
+      _espConnected = state.espConnected ?? _espConnected;
+      _raspberryPiConnected = state.raspberryPiConnected ?? _raspberryPiConnected;
+      
       notifyListeners();
     });
 
@@ -97,6 +109,29 @@ class RobotProvider with ChangeNotifier {
 
   void setEmotion(String emotion) {
     _wsService.sendEmotionCommand(emotion);
+  }
+
+  // Control Mode Methods
+  Future<void> setControlMode(String mode) async {
+    if (_apiService == null) {
+      _errorMessage = 'Not connected to server';
+      notifyListeners();
+      return;
+    }
+
+    try {
+      await _apiService!.setControlMode(mode);
+      _controlMode = mode;
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = 'Failed to set control mode: $e';
+      notifyListeners();
+    }
+  }
+
+  void toggleControlMode() {
+    final newMode = _controlMode == 'manual' ? 'autonomous' : 'manual';
+    setControlMode(newMode);
   }
 
   // Mental Health Methods

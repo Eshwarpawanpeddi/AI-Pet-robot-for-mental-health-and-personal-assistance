@@ -1,13 +1,15 @@
-// ESP12E Configuration Header
+// ESP12E Configuration Header - Example Template
+// Copy this file to config.h and update with your settings
 // Hardware pin definitions and constants
 
 #ifndef CONFIG_H
 #define CONFIG_H
 
 // Wi-Fi Configuration
+// IMPORTANT: Update these with your actual Wi-Fi credentials
 #define WIFI_SSID "YOUR_WIFI_SSID"
 #define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
-#define SERVER_HOST "192.168.1.100"  // Server IP address
+#define SERVER_HOST "192.168.1.100"  // Server IP address - UPDATE THIS
 #define SERVER_PORT 8000
 #define WEBSOCKET_PATH "/ws/esp"
 #define BAUD_RATE 115200

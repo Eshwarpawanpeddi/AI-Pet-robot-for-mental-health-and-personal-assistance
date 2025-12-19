@@ -5,6 +5,9 @@ class RobotState {
   final int batteryLevel;
   final SensorData? sensorData;
   final DateTime timestamp;
+  final String? controlMode;
+  final bool? espConnected;
+  final bool? raspberryPiConnected;
 
   RobotState({
     required this.emotion,
@@ -13,6 +16,9 @@ class RobotState {
     required this.batteryLevel,
     this.sensorData,
     DateTime? timestamp,
+    this.controlMode,
+    this.espConnected,
+    this.raspberryPiConnected,
   }) : timestamp = timestamp ?? DateTime.now();
 
   factory RobotState.fromJson(Map<String, dynamic> json) {
@@ -24,6 +30,9 @@ class RobotState {
       sensorData: json['sensor_data'] != null
           ? SensorData.fromJson(json['sensor_data'])
           : null,
+      controlMode: json['control_mode'],
+      espConnected: json['esp_connected'],
+      raspberryPiConnected: json['raspberry_pi_connected'],
     );
   }
 
@@ -34,6 +43,9 @@ class RobotState {
       'is_listening': isListening,
       'battery_level': batteryLevel,
       'sensor_data': sensorData?.toJson(),
+      'control_mode': controlMode,
+      'esp_connected': espConnected,
+      'raspberry_pi_connected': raspberryPiConnected,
     };
   }
 
@@ -43,6 +55,9 @@ class RobotState {
     bool? isListening,
     int? batteryLevel,
     SensorData? sensorData,
+    String? controlMode,
+    bool? espConnected,
+    bool? raspberryPiConnected,
   }) {
     return RobotState(
       emotion: emotion ?? this.emotion,
@@ -50,6 +65,9 @@ class RobotState {
       isListening: isListening ?? this.isListening,
       batteryLevel: batteryLevel ?? this.batteryLevel,
       sensorData: sensorData ?? this.sensorData,
+      controlMode: controlMode ?? this.controlMode,
+      espConnected: espConnected ?? this.espConnected,
+      raspberryPiConnected: raspberryPiConnected ?? this.raspberryPiConnected,
     );
   }
 }

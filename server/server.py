@@ -44,8 +44,11 @@ class RobotState:
         self.is_listening = False
         self.battery_level = 100
         self.connected_clients: List[WebSocket] = []
+        self.esp_client: Optional[WebSocket] = None
+        self.raspberry_pi_client: Optional[WebSocket] = None
         self.sensor_data = {}
         self.gemini_session = None
+        self.control_mode = "manual"  # manual or autonomous
 
 robot_state = RobotState()
 
@@ -156,6 +159,8 @@ async def websocket_control(websocket: WebSocket):
                 await handle_emotion_command(data)
             elif command_type == 'get_state':
                 await websocket.send_json(get_robot_state())
+            elif command_type == 'set_mode':
+                await handle_mode_change(data)
             
             # Broadcast state to all clients
             await broadcast_state()
@@ -165,14 +170,88 @@ async def websocket_control(websocket: WebSocket):
     finally:
         robot_state.connected_clients.remove(websocket)
 
+@app.websocket("/ws/esp")
+async def websocket_esp(websocket: WebSocket):
+    """WebSocket endpoint for ESP12E motor controller"""
+    await websocket.accept()
+    robot_state.esp_client = websocket
+    logger.info("ESP12E connected")
+    
+    try:
+        while True:
+            data = await websocket.receive_json()
+            
+            # Handle ESP12E messages
+            msg_type = data.get('type')
+            
+            if msg_type == 'heartbeat':
+                logger.debug("ESP12E heartbeat received")
+            elif msg_type == 'sensor':
+                sensor = data.get('sensor')
+                value = data.get('value')
+                robot_state.sensor_data[sensor] = value
+                logger.info(f"ESP12E sensor update: {sensor} = {value}")
+            elif msg_type == 'status':
+                logger.info(f"ESP12E status: {data}")
+            
+            # Broadcast state update
+            await broadcast_state()
+    
+    except Exception as e:
+        logger.error(f"ESP WebSocket error: {e}")
+    finally:
+        robot_state.esp_client = None
+        logger.info("ESP12E disconnected")
+
+@app.websocket("/ws/raspberry_pi")
+async def websocket_raspberry_pi(websocket: WebSocket):
+    """WebSocket endpoint for Raspberry Pi face display"""
+    await websocket.accept()
+    robot_state.raspberry_pi_client = websocket
+    logger.info("Raspberry Pi connected")
+    
+    try:
+        while True:
+            data = await websocket.receive_json()
+            
+            # Handle Raspberry Pi messages
+            msg_type = data.get('type')
+            
+            if msg_type == 'status':
+                logger.info(f"Raspberry Pi status: {data}")
+            elif msg_type == 'sensor':
+                sensor = data.get('sensor')
+                value = data.get('value')
+                robot_state.sensor_data[sensor] = value
+            
+            # Broadcast state update
+            await broadcast_state()
+    
+    except Exception as e:
+        logger.error(f"Raspberry Pi WebSocket error: {e}")
+    finally:
+        robot_state.raspberry_pi_client = None
+        logger.info("Raspberry Pi disconnected")
+
 async def handle_move_command(data: Dict):
-    """Handle movement commands"""
+    """Handle movement commands - send to ESP12E"""
     direction = data.get('direction')  # forward, backward, left, right, stop
     speed = data.get('speed', 200)
     
     logger.info(f"Move command: {direction} at speed {speed}")
-    # Send to Raspberry Pi via MQTT/gRPC
-    # await send_to_pi({"type": "motor", "direction": direction, "speed": speed})
+    
+    # Send to ESP12E via WebSocket
+    if robot_state.esp_client:
+        try:
+            await robot_state.esp_client.send_json({
+                "type": "move",
+                "direction": direction,
+                "speed": speed
+            })
+        except Exception as e:
+            logger.error(f"Failed to send move command to ESP12E: {e}")
+    else:
+        logger.warning("ESP12E not connected - cannot send move command")
 
 async def handle_voice_command(data: Dict):
     """Handle voice commands via Gemini Live API"""
@@ -207,11 +286,40 @@ async def handle_voice_command(data: Dict):
         robot_state.is_listening = False
         await broadcast_state()
 
+async def handle_mode_change(data: Dict):
+    """Handle control mode change (manual vs autonomous)"""
+    mode = data.get('mode', 'manual')  # manual or autonomous
+    
+    if mode not in ['manual', 'autonomous']:
+        logger.warning(f"Invalid mode: {mode}")
+        return
+    
+    robot_state.control_mode = mode
+    logger.info(f"Control mode changed to: {mode}")
+    
+    # Broadcast mode change to all clients
+    await broadcast_message({
+        'type': 'mode_changed',
+        'mode': mode
+    })
+
 async def handle_emotion_command(data: Dict):
-    """Handle emotion change commands"""
+    """Handle emotion change commands - send to Raspberry Pi"""
     emotion = data.get('emotion')
     robot_state.emotion = emotion
     logger.info(f"Emotion changed to: {emotion}")
+    
+    # Send to Raspberry Pi for face display update
+    if robot_state.raspberry_pi_client:
+        try:
+            await robot_state.raspberry_pi_client.send_json({
+                "type": "emotion",
+                "emotion": emotion
+            })
+        except Exception as e:
+            logger.error(f"Failed to send emotion to Raspberry Pi: {e}")
+    else:
+        logger.warning("Raspberry Pi not connected - cannot update face display")
 
 async def process_voice_with_gemini(audio_data: bytes) -> str:
     """Process voice with Gemini Live API"""
@@ -278,7 +386,10 @@ def get_robot_state() -> Dict:
         'is_speaking': robot_state.is_speaking,
         'is_listening': robot_state.is_listening,
         'battery_level': robot_state.battery_level,
-        'sensor_data': robot_state.sensor_data
+        'sensor_data': robot_state.sensor_data,
+        'control_mode': robot_state.control_mode,
+        'esp_connected': robot_state.esp_client is not None,
+        'raspberry_pi_connected': robot_state.raspberry_pi_client is not None
     }
 
 async def broadcast_state():
@@ -308,6 +419,28 @@ async def send_command(command: Dict):
     """Send command via HTTP"""
     await handle_move_command(command)
     return {"status": "ok"}
+
+@app.post("/api/mode")
+async def set_mode(mode_data: Dict):
+    """Set control mode (manual or autonomous)"""
+    mode = mode_data.get("mode", "manual")
+    
+    if mode not in ["manual", "autonomous"]:
+        raise HTTPException(status_code=400, detail="Invalid mode. Must be 'manual' or 'autonomous'")
+    
+    robot_state.control_mode = mode
+    await broadcast_message({
+        'type': 'mode_changed',
+        'mode': mode
+    })
+    
+    return {"status": "ok", "mode": mode}
+
+@app.get("/api/mode")
+async def get_mode():
+    """Get current control mode"""
+    return {"mode": robot_state.control_mode}
+
 
 @app.get("/health")
 async def health_check():
