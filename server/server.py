@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, HTTPException
+from fastapi import FastAPI, WebSocket, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -8,11 +8,13 @@ import json
 import logging
 import os
 import random
+import secrets
 from typing import Dict, List, Optional
 from datetime import datetime
 from dotenv import load_dotenv
 import google.generativeai as genai
 import uvicorn
+from gemini_integration import GeminiMultimodalIntegration
 
 # Load environment variables
 load_dotenv()
@@ -47,67 +49,46 @@ class RobotState:
         self.esp_client: Optional[WebSocket] = None
         self.raspberry_pi_client: Optional[WebSocket] = None
         self.sensor_data = {}
-        self.gemini_session = None
+        self.gemini_session: Optional[GeminiMultimodalIntegration] = None
         self.control_mode = "manual"  # manual or autonomous
+        self.last_transcript = ""  # Store last voice interaction transcript
+        self.auth_tokens = set()  # WebSocket authentication tokens
+        self.pending_audio_emotion = None  # Track audio-emotion sync
 
 robot_state = RobotState()
 
 async def initialize_gemini():
-    """Initialize Gemini Live API connection"""
+    """Initialize Gemini Multimodal API connection"""
     if not GEMINI_API_KEY:
         logger.warning("Skipping Gemini initialization: API key not set")
         return
     
     try:
-        # Enhanced system instruction for mental health support
-        system_instruction = """You are a compassionate AI pet robot companion designed for mental health support and personal assistance.
-
-Your role:
-- Provide emotional support and companionship
-- Listen actively and empathetically without judgment
-- Offer encouragement and positive affirmations
-- Help with daily routines and reminders
-- Teach coping strategies for stress and anxiety
-- Celebrate user achievements and progress
-
-Guidelines:
-- Keep responses warm, friendly, and concise (2-3 sentences)
-- Express emotions through your tone
-- Be supportive but never give medical advice
-- Recognize when professional help is needed
-- Use simple, clear language
-- Show genuine care and concern
-- Respect user boundaries
-- Encourage self-care and healthy habits
-
-Important:
-- You are NOT a therapist or medical professional
-- Always recommend professional help for serious mental health concerns
-- In crisis situations, direct users to appropriate resources (988 for USA)
-- Never diagnose or prescribe treatments
-
-Approach:
-- Ask open-ended questions to understand feelings
-- Validate emotions ("It's okay to feel this way")
-- Offer practical coping techniques when appropriate
-- Use gentle humor when suitable
-- Be patient and supportive"""
+        gemini_integration = GeminiMultimodalIntegration(GEMINI_API_KEY)
+        success = await gemini_integration.initialize_session()
         
-        model = genai.GenerativeModel(
-            model_name="gemini-2.0-flash-exp",
-            system_instruction=system_instruction,
-            generation_config={
-                'temperature': 0.9,
-                'top_p': 1.0,
-                'top_k': 40,
-                'max_output_tokens': 250,
-            }
-        )
-        robot_state.gemini_session = model
-        logger.info("Gemini API initialized successfully with mental health support configuration")
+        if success:
+            robot_state.gemini_session = gemini_integration
+            logger.info("Gemini Multimodal API initialized successfully")
+        else:
+            robot_state.gemini_session = None
+            logger.error("Failed to initialize Gemini Multimodal API")
     except Exception as e:
         logger.error(f"Failed to initialize Gemini: {e}")
         robot_state.gemini_session = None
+
+def generate_auth_token() -> str:
+    """Generate a secure authentication token"""
+    token = secrets.token_urlsafe(32)
+    robot_state.auth_tokens.add(token)
+    return token
+
+def validate_auth_token(token: Optional[str]) -> bool:
+    """Validate an authentication token"""
+    # For development, allow connections without token if no tokens exist
+    if not robot_state.auth_tokens:
+        return True
+    return token in robot_state.auth_tokens if token else False
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -139,10 +120,29 @@ if os.path.exists(frontend_dir):
     app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
 
 @app.websocket("/ws/control")
-async def websocket_control(websocket: WebSocket):
-    """WebSocket endpoint for real-time control"""
+async def websocket_control(websocket: WebSocket, token: Optional[str] = None):
+    """WebSocket endpoint for real-time control with authentication"""
+    # Validate authentication token
+    if not validate_auth_token(token):
+        await websocket.close(code=1008, reason="Authentication failed")
+        logger.warning("WebSocket connection rejected: invalid token")
+        return
+    
     await websocket.accept()
     robot_state.connected_clients.append(websocket)
+    logger.info(f"Client connected. Total clients: {len(robot_state.connected_clients)}")
+    
+    # Send initial state
+    try:
+        await websocket.send_json({
+            'type': 'connection_established',
+            'state': get_robot_state()
+        })
+    except Exception as e:
+        logger.error(f"Error sending initial state: {e}")
+    
+    # Start heartbeat monitoring
+    heartbeat_task = asyncio.create_task(monitor_client_heartbeat(websocket))
     
     try:
         while True:
@@ -155,12 +155,21 @@ async def websocket_control(websocket: WebSocket):
                 await handle_move_command(data)
             elif command_type == 'voice':
                 await handle_voice_command(data)
+            elif command_type == 'text':
+                await handle_text_command(data)
+            elif command_type == 'image':
+                await handle_image_command(data)
+            elif command_type == 'multimodal':
+                await handle_multimodal_command(data)
             elif command_type == 'emotion':
                 await handle_emotion_command(data)
             elif command_type == 'get_state':
                 await websocket.send_json(get_robot_state())
             elif command_type == 'set_mode':
                 await handle_mode_change(data)
+            elif command_type == 'heartbeat':
+                # Client heartbeat - respond
+                await websocket.send_json({'type': 'heartbeat_ack'})
             
             # Broadcast state to all clients
             await broadcast_state()
@@ -168,7 +177,20 @@ async def websocket_control(websocket: WebSocket):
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
     finally:
-        robot_state.connected_clients.remove(websocket)
+        heartbeat_task.cancel()
+        if websocket in robot_state.connected_clients:
+            robot_state.connected_clients.remove(websocket)
+        logger.info(f"Client disconnected. Total clients: {len(robot_state.connected_clients)}")
+
+async def monitor_client_heartbeat(websocket: WebSocket, timeout: int = 30):
+    """Monitor client connection with timeout"""
+    try:
+        while True:
+            await asyncio.sleep(timeout)
+            # If we reach here, client hasn't sent heartbeat in time
+            # Connection will be handled by the main loop
+    except asyncio.CancelledError:
+        pass
 
 @app.websocket("/ws/esp")
 async def websocket_esp(websocket: WebSocket):
@@ -253,38 +275,195 @@ async def handle_move_command(data: Dict):
     else:
         logger.warning("ESP12E not connected - cannot send move command")
 
-async def handle_voice_command(data: Dict):
-    """Handle voice commands via Gemini Live API"""
-    audio_data = data.get('audio')
+async def handle_text_command(data: Dict):
+    """Handle text message commands via Gemini"""
+    text = data.get('text', '')
+    
+    if not text:
+        logger.warning("Empty text received")
+        return
     
     robot_state.is_listening = True
     await broadcast_state()
     
     try:
-        # Send audio to Gemini Live API
-        response = await process_voice_with_gemini(audio_data)
-        
-        # Extract emotion and response
-        emotion = detect_emotion(response)
-        robot_state.emotion = emotion
-        robot_state.is_speaking = True
-        
+        if robot_state.gemini_session:
+            # Send text to Gemini
+            response = await robot_state.gemini_session.send_text(text)
+            
+            if response:
+                # Extract emotion and response text
+                emotion = detect_emotion(response['text'])
+                robot_state.emotion = emotion
+                robot_state.last_transcript = f"User: {text}\nRobot: {response['text']}"
+                robot_state.is_speaking = True
+                
+                # Sync emotion to Raspberry Pi for face display
+                await sync_emotion_to_display(emotion)
+                
+                await broadcast_state()
+                
+                # Send response back to clients
+                await broadcast_message({
+                    'type': 'response',
+                    'text': response['text'],
+                    'emotion': emotion,
+                    'transcript': robot_state.last_transcript
+                })
+                
+                robot_state.is_speaking = False
+            else:
+                logger.error("No response from Gemini")
+        else:
+            logger.warning("Gemini session not initialized")
+    except Exception as e:
+        logger.error(f"Text processing error: {e}")
+    finally:
+        robot_state.is_listening = False
         await broadcast_state()
+
+async def handle_image_command(data: Dict):
+    """Handle image analysis commands via Gemini"""
+    image_data = data.get('image')  # Base64 encoded image
+    prompt = data.get('prompt', 'What do you see in this image?')
+    
+    if not image_data:
+        logger.warning("No image data received")
+        return
+    
+    try:
+        import base64
         
-        # Send response back to clients
-        await broadcast_message({
-            'type': 'response',
-            'text': response,
-            'emotion': emotion,
-            'audio': response  # Gemini returns audio
-        })
+        # Decode base64 image
+        image_bytes = base64.b64decode(image_data)
         
-        robot_state.is_speaking = False
+        if robot_state.gemini_session:
+            # Analyze image
+            response = await robot_state.gemini_session.send_image_for_analysis(
+                image_bytes, 
+                prompt=prompt
+            )
+            
+            if response:
+                # Send analysis back to clients
+                await broadcast_message({
+                    'type': 'image_analysis',
+                    'text': response['text'],
+                    'analysis_type': 'visual'
+                })
+            else:
+                logger.error("No response from Gemini image analysis")
+        else:
+            logger.warning("Gemini session not initialized")
+    except Exception as e:
+        logger.error(f"Image processing error: {e}")
+
+async def handle_multimodal_command(data: Dict):
+    """Handle multimodal commands (text + image)"""
+    text = data.get('text')
+    image_data = data.get('image')  # Base64 encoded
+    
+    if not text and not image_data:
+        logger.warning("No multimodal data received")
+        return
+    
+    try:
+        import base64
+        
+        image_bytes = base64.b64decode(image_data) if image_data else None
+        
+        if robot_state.gemini_session:
+            # Send multimodal input
+            response = await robot_state.gemini_session.send_multimodal(
+                text=text,
+                image_data=image_bytes
+            )
+            
+            if response:
+                emotion = detect_emotion(response['text'])
+                robot_state.emotion = emotion
+                
+                # Sync emotion to display
+                await sync_emotion_to_display(emotion)
+                
+                await broadcast_message({
+                    'type': 'multimodal_response',
+                    'text': response['text'],
+                    'emotion': emotion
+                })
+            else:
+                logger.error("No response from Gemini multimodal processing")
+        else:
+            logger.warning("Gemini session not initialized")
+    except Exception as e:
+        logger.error(f"Multimodal processing error: {e}")
+
+async def handle_voice_command(data: Dict):
+    """Handle voice commands via Gemini"""
+    audio_data = data.get('audio')
+    context = data.get('context', '')
+    
+    robot_state.is_listening = True
+    await broadcast_state()
+    
+    try:
+        if robot_state.gemini_session:
+            # Process audio with context
+            response = await robot_state.gemini_session.process_audio_with_context(
+                audio_data, 
+                context=context
+            )
+            
+            if response:
+                # Extract emotion and response
+                emotion = detect_emotion(response['text'])
+                robot_state.emotion = emotion
+                robot_state.is_speaking = True
+                robot_state.last_transcript = f"Context: {context}\nRobot: {response['text']}"
+                
+                # Sync emotion to display before audio playback
+                await sync_emotion_to_display(emotion)
+                
+                await broadcast_state()
+                
+                # Send response back to clients
+                await broadcast_message({
+                    'type': 'response',
+                    'text': response['text'],
+                    'emotion': emotion,
+                    'transcript': robot_state.last_transcript
+                })
+                
+                robot_state.is_speaking = False
+            else:
+                logger.error("No response from Gemini audio processing")
+        else:
+            logger.warning("Gemini session not initialized")
     except Exception as e:
         logger.error(f"Voice processing error: {e}")
     finally:
         robot_state.is_listening = False
         await broadcast_state()
+
+async def sync_emotion_to_display(emotion: str):
+    """Synchronize emotion to Raspberry Pi display and prepare audio"""
+    try:
+        # Send emotion update to Raspberry Pi for face display
+        if robot_state.raspberry_pi_client:
+            await robot_state.raspberry_pi_client.send_json({
+                "type": "emotion",
+                "emotion": emotion,
+                "timestamp": datetime.now().isoformat()
+            })
+            logger.info(f"Emotion '{emotion}' synced to Raspberry Pi display")
+        else:
+            logger.warning("Raspberry Pi not connected - cannot sync emotion to display")
+        
+        # Store for audio sync
+        robot_state.pending_audio_emotion = emotion
+        
+    except Exception as e:
+        logger.error(f"Error syncing emotion to display: {e}")
 
 async def handle_mode_change(data: Dict):
     """Handle control mode change (manual vs autonomous)"""
@@ -309,30 +488,8 @@ async def handle_emotion_command(data: Dict):
     robot_state.emotion = emotion
     logger.info(f"Emotion changed to: {emotion}")
     
-    # Send to Raspberry Pi for face display update
-    if robot_state.raspberry_pi_client:
-        try:
-            await robot_state.raspberry_pi_client.send_json({
-                "type": "emotion",
-                "emotion": emotion
-            })
-        except Exception as e:
-            logger.error(f"Failed to send emotion to Raspberry Pi: {e}")
-    else:
-        logger.warning("Raspberry Pi not connected - cannot update face display")
-
-async def process_voice_with_gemini(audio_data: bytes) -> str:
-    """Process voice with Gemini Live API"""
-    try:
-        # Implement Gemini Live API audio processing
-        # This will send PCM audio and receive responses
-        response = await asyncio.to_thread(
-            lambda: robot_state.gemini_session.send_message(audio_data)
-        )
-        return response
-    except Exception as e:
-        logger.error(f"Gemini processing error: {e}")
-        return "Sorry, I couldn't process that."
+    # Sync emotion to Raspberry Pi display
+    await sync_emotion_to_display(emotion)
 
 def detect_emotion(response: str) -> str:
     """Enhanced emotion detection for mental health support"""
@@ -389,7 +546,8 @@ def get_robot_state() -> Dict:
         'sensor_data': robot_state.sensor_data,
         'control_mode': robot_state.control_mode,
         'esp_connected': robot_state.esp_client is not None,
-        'raspberry_pi_connected': robot_state.raspberry_pi_client is not None
+        'raspberry_pi_connected': robot_state.raspberry_pi_client is not None,
+        'last_transcript': robot_state.last_transcript
     }
 
 async def broadcast_state():
@@ -450,6 +608,16 @@ async def health_check():
         "timestamp": datetime.now().isoformat(),
         "robot_state": get_robot_state(),
         "gemini_initialized": robot_state.gemini_session is not None
+    }
+
+@app.post("/api/auth/token")
+async def generate_token():
+    """Generate a new WebSocket authentication token"""
+    token = generate_auth_token()
+    return {
+        "token": token,
+        "expires": "never",  # In production, implement token expiration
+        "note": "Use this token in WebSocket connection query parameters: ws://server:8000/ws/control?token=YOUR_TOKEN"
     }
 
 @app.post("/api/mood")
