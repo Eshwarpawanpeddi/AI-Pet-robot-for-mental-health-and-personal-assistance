@@ -17,6 +17,8 @@ class WebSocketService {
   bool _isConnected = false;
   Timer? _heartbeatTimer;
   Timer? _reconnectTimer;
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectDelay = 60; // Maximum 60 seconds
 
   Stream<RobotState> get stateStream => _stateController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
@@ -58,6 +60,7 @@ class WebSocketService {
 
       _setConnectionStatus(true);
       _startHeartbeat();
+      _reconnectAttempts = 0; // Reset on successful connection
     } catch (e) {
       print('Failed to connect: $e');
       _setConnectionStatus(false);
@@ -110,7 +113,14 @@ class WebSocketService {
 
   void _scheduleReconnect() {
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(Duration(seconds: 5), () {
+    
+    // Exponential backoff: 5s, 10s, 20s, 40s, up to max of 60s
+    _reconnectAttempts++;
+    int delay = (5 * (1 << (_reconnectAttempts - 1))).clamp(5, _maxReconnectDelay);
+    
+    print('Scheduling reconnect attempt $_reconnectAttempts in ${delay}s');
+    
+    _reconnectTimer = Timer(Duration(seconds: delay), () {
       if (!_isConnected && _currentUrl != null) {
         print('Attempting to reconnect...');
         connect(_currentUrl!, token: _authToken);

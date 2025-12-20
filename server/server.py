@@ -85,9 +85,18 @@ def generate_auth_token() -> str:
 
 def validate_auth_token(token: Optional[str]) -> bool:
     """Validate an authentication token"""
-    # For development, allow connections without token if no tokens exist
-    if not robot_state.auth_tokens:
+    # Check if authentication is disabled for development
+    auth_disabled = os.getenv("DISABLE_WS_AUTH", "false").lower() == "true"
+    
+    if auth_disabled:
+        logger.warning("WebSocket authentication is disabled - only use in development!")
         return True
+    
+    # For development without tokens configured, allow connections
+    if not robot_state.auth_tokens:
+        logger.warning("No authentication tokens configured - consider generating tokens for security")
+        return True
+    
     return token in robot_state.auth_tokens if token else False
 
 @asynccontextmanager
@@ -132,6 +141,9 @@ async def websocket_control(websocket: WebSocket, token: Optional[str] = None):
     robot_state.connected_clients.append(websocket)
     logger.info(f"Client connected. Total clients: {len(robot_state.connected_clients)}")
     
+    # Track last activity for heartbeat monitoring
+    last_activity = {'time': asyncio.get_event_loop().time()}
+    
     # Send initial state
     try:
         await websocket.send_json({
@@ -142,11 +154,14 @@ async def websocket_control(websocket: WebSocket, token: Optional[str] = None):
         logger.error(f"Error sending initial state: {e}")
     
     # Start heartbeat monitoring
-    heartbeat_task = asyncio.create_task(monitor_client_heartbeat(websocket))
+    heartbeat_task = asyncio.create_task(monitor_client_heartbeat(websocket, last_activity))
     
     try:
         while True:
             data = await websocket.receive_json()
+            
+            # Update last activity time
+            last_activity['time'] = asyncio.get_event_loop().time()
             
             # Route command
             command_type = data.get('type')
@@ -182,14 +197,23 @@ async def websocket_control(websocket: WebSocket, token: Optional[str] = None):
             robot_state.connected_clients.remove(websocket)
         logger.info(f"Client disconnected. Total clients: {len(robot_state.connected_clients)}")
 
-async def monitor_client_heartbeat(websocket: WebSocket, timeout: int = 30):
-    """Monitor client connection with timeout"""
+async def monitor_client_heartbeat(websocket: WebSocket, last_activity: dict, timeout: int = 30):
+    """Monitor client connection with timeout - closes connection if no heartbeat received"""
     try:
         while True:
-            await asyncio.sleep(timeout)
-            # If we reach here, client hasn't sent heartbeat in time
-            # Connection will be handled by the main loop
+            await asyncio.sleep(5)  # Check every 5 seconds
+            current_time = asyncio.get_event_loop().time()
+            
+            # Check if timeout exceeded
+            if current_time - last_activity['time'] > timeout:
+                logger.warning(f"Client heartbeat timeout after {timeout}s")
+                try:
+                    await websocket.close(code=1001, reason="Heartbeat timeout")
+                except:
+                    pass
+                break
     except asyncio.CancelledError:
+        # Normal cancellation when connection closes
         pass
 
 @app.websocket("/ws/esp")
