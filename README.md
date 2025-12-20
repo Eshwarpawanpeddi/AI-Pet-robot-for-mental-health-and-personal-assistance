@@ -18,6 +18,7 @@ This robot is designed to:
 
 ### Mental Health Support
 - **Empathetic Conversations**: Powered by Google's Gemini AI with mental health-focused prompting
+- **Multimodal Interactions**: Text, voice, and image processing for richer communication
 - **Mood Tracking**: Log and monitor emotional patterns
 - **Crisis Resources**: Immediate access to professional help resources
 - **Breathing Exercises**: Guided relaxation techniques
@@ -30,14 +31,18 @@ This robot is designed to:
 - **Self-Care Prompts**: Hydration, movement, rest reminders
 - **Goal Tracking**: Set and achieve wellness goals
 - **Social Connection**: Encouragement for healthy relationships
+- **Image Analysis**: Visual context understanding for better assistance
 
 ### Technical Features
 - **Voice Interaction**: Natural conversation via Gemini AI
+- **Multimodal API**: Process text, images, and audio simultaneously
 - **Animated Face Display**: Expressive, comforting presence
+- **Emotion Synchronization**: Smooth face/audio alignment
 - **Autonomous Movement**: Physical robot capabilities
-- **WebSocket Communication**: Real-time responsiveness
+- **WebSocket Communication**: Real-time responsiveness with authentication
 - **ROS Integration**: Full Robot Operating System support
 - **Mobile App**: Android/iOS app for remote control (Flutter)
+- **Security**: Token-based authentication and encrypted connections
 - **Privacy-First**: All data stays on your device
 
 ## 🏗️ System Architecture
@@ -559,6 +564,7 @@ controller.stop()
 ## 📚 Additional Documentation
 
 - **[Mental Health Features](MENTAL_HEALTH_FEATURES.md)** - Comprehensive mental health support documentation
+- **[Multimodal API Guide](downloads/multimodal-api-guide.md)** - Complete guide for multimodal interactions
 - [Setup Guide](downloads/setup-guide.md) - Detailed setup instructions
 - [Architecture](downloads/robot-architecture.md) - System architecture details
 - [API Integration](downloads/api-integration.md) - API documentation

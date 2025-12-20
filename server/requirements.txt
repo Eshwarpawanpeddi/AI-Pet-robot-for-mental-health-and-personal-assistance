@@ -2,7 +2,7 @@ fastapi==0.109.1
 uvicorn[standard]==0.27.0
 websockets==12.0
 python-multipart==0.0.18
-google-generativeai==0.3.2
+google-generativeai==0.8.3
 python-dotenv==1.0.0
 pydantic==2.5.3
 pydantic-settings==2.1.0

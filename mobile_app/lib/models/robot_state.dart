@@ -8,6 +8,7 @@ class RobotState {
   final String? controlMode;
   final bool? espConnected;
   final bool? raspberryPiConnected;
+  final String? lastTranscript;
 
   RobotState({
     required this.emotion,
@@ -19,6 +20,7 @@ class RobotState {
     this.controlMode,
     this.espConnected,
     this.raspberryPiConnected,
+    this.lastTranscript,
   }) : timestamp = timestamp ?? DateTime.now();
 
   factory RobotState.fromJson(Map<String, dynamic> json) {
@@ -33,6 +35,7 @@ class RobotState {
       controlMode: json['control_mode'],
       espConnected: json['esp_connected'],
       raspberryPiConnected: json['raspberry_pi_connected'],
+      lastTranscript: json['last_transcript'],
     );
   }
 
@@ -46,6 +49,7 @@ class RobotState {
       'control_mode': controlMode,
       'esp_connected': espConnected,
       'raspberry_pi_connected': raspberryPiConnected,
+      'last_transcript': lastTranscript,
     };
   }
 
@@ -58,6 +62,7 @@ class RobotState {
     String? controlMode,
     bool? espConnected,
     bool? raspberryPiConnected,
+    String? lastTranscript,
   }) {
     return RobotState(
       emotion: emotion ?? this.emotion,
@@ -68,6 +73,7 @@ class RobotState {
       controlMode: controlMode ?? this.controlMode,
       espConnected: espConnected ?? this.espConnected,
       raspberryPiConnected: raspberryPiConnected ?? this.raspberryPiConnected,
+      lastTranscript: lastTranscript ?? this.lastTranscript,
     );
   }
 }
