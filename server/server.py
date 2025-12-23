@@ -280,24 +280,25 @@ async def websocket_raspberry_pi(websocket: WebSocket):
         logger.info("Raspberry Pi disconnected")
 
 async def handle_move_command(data: Dict):
-    """Handle movement commands - send to ESP12E"""
+    """Handle movement commands - send to Raspberry Pi for direct motor control"""
     direction = data.get('direction')  # forward, backward, left, right, stop
-    speed = data.get('speed', 200)
+    speed = data.get('speed', 75)  # Default speed 75%
     
     logger.info(f"Move command: {direction} at speed {speed}")
     
-    # Send to ESP12E via WebSocket
-    if robot_state.esp_client:
+    # Send to Raspberry Pi via WebSocket for direct motor control
+    if robot_state.raspberry_pi_client:
         try:
-            await robot_state.esp_client.send_json({
+            await robot_state.raspberry_pi_client.send_json({
                 "type": "move",
                 "direction": direction,
                 "speed": speed
             })
+            logger.info(f"Motor command sent to Raspberry Pi: {direction} at {speed}%")
         except Exception as e:
-            logger.error(f"Failed to send move command to ESP12E: {e}")
+            logger.error(f"Failed to send move command to Raspberry Pi: {e}")
     else:
-        logger.warning("ESP12E not connected - cannot send move command")
+        logger.warning("Raspberry Pi not connected - cannot send move command")
 
 async def handle_text_command(data: Dict):
     """Handle text message commands via Gemini"""

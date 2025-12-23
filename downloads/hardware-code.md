@@ -1,302 +1,171 @@
-# Hardware Code Documentation - Wi-Fi Architecture
+# Hardware Code Documentation - Direct Pi Motor Control
 
 ## Overview
 
-This document describes the hardware code for the AI Pet Robot using the new Wi-Fi-based architecture. All hardware components communicate with the central server via WebSocket connections.
+This document describes the hardware code for the AI Pet Robot using the new direct Raspberry Pi motor control architecture. The Raspberry Pi controls 4 DC motors via 2 L298N motor drivers using GPIO pins, eliminating the need for a separate ESP12E module.
 
-## ESP12E Motor Controller (Wi-Fi Version)
+## Raspberry Pi Motor Controller
 
 ### Features
 
-- Wi-Fi WebSocket connection to central server
-- PWM motor control with L298N driver
-- Automatic fallback mode on connection loss
-- Real-time status reporting via heartbeat
-- Sensor data transmission
-- Command acknowledgment
+- WebSocket connection to central server for command reception
+- Direct GPIO-based motor control for 4 wheels
+- PWM speed control (0-100% duty cycle)
+- Synchronized 4-wheel movement
+- Real-time face display and audio output
+- Status reporting to server
 
 ### Hardware Configuration
 
-#### Pin Mapping
+#### GPIO Pin Mapping
 
-```cpp
-// Motor Control Pins (L298N Motor Driver)
-#define MOTOR_A_PIN1 D0  // GPIO16 - Motor A Direction 1
-#define MOTOR_A_PIN2 D1  // GPIO5  - Motor A Direction 2
-#define MOTOR_B_PIN1 D2  // GPIO4  - Motor B Direction 1
-#define MOTOR_B_PIN2 D3  // GPIO0  - Motor B Direction 2
+**Motor Driver 1 (Front Wheels - Motors A & B)**:
+```python
+MOTOR_A_IN1 = 17   # Motor A Direction 1
+MOTOR_A_IN2 = 27   # Motor A Direction 2
+MOTOR_A_ENA = 22   # Motor A Speed/PWM Enable
 
-// PWM Control Pins (Speed Control)
-#define MOTOR_A_PWM D5   // GPIO14 - Motor A Speed (PWM)
-#define MOTOR_B_PWM D6   // GPIO12 - Motor B Speed (PWM)
+MOTOR_B_IN3 = 23   # Motor B Direction 1
+MOTOR_B_IN4 = 24   # Motor B Direction 2
+MOTOR_B_ENB = 25   # Motor B Speed/PWM Enable
+```
 
-// Optional Sensor Pins
-#define TOUCH_SENSOR_PIN D7   // GPIO13
+**Motor Driver 2 (Rear Wheels - Motors C & D)**:
+```python
+MOTOR_C_IN1 = 5    # Motor C Direction 1
+MOTOR_C_IN2 = 6    # Motor C Direction 2
+MOTOR_C_ENA = 13   # Motor C Speed/PWM Enable
+
+MOTOR_D_IN3 = 19   # Motor D Direction 1
+MOTOR_D_IN4 = 26   # Motor D Direction 2
+MOTOR_D_ENB = 12   # Motor D Speed/PWM Enable
+```
+
+**PWM Configuration**:
+```python
+PWM_FREQUENCY = 1000  # 1kHz for smooth motor operation
 ```
 
 #### Wiring Diagram
 
 ```
-ESP12E          L298N Motor Driver
-------          ------------------
-D0 (GPIO16) --> IN1
-D1 (GPIO5)  --> IN2
-D2 (GPIO4)  --> IN3
-D3 (GPIO0)  --> IN4
-D5 (GPIO14) --> ENA (Enable A / PWM)
-D6 (GPIO12) --> ENB (Enable B / PWM)
-GND         --> GND
+Raspberry Pi GPIO    L298N Motor Driver 1 (Front Wheels)
+-----------------    -----------------------------------
+GPIO17           --> IN1
+GPIO27           --> IN2
+GPIO22           --> ENA (Enable A / PWM)
+GPIO23           --> IN3
+GPIO24           --> IN4
+GPIO25           --> ENB (Enable B / PWM)
+GND              --> GND
 
-L298N           Motors & Power
------           --------------
-OUT1, OUT2  --> DC Motor A
-OUT3, OUT4  --> DC Motor B
-12V         --> External Power Supply (7-12V)
-GND         --> Power Supply GND & ESP GND
+L298N Driver 1      Motors & Power
+--------------      --------------
+OUT1, OUT2      --> DC Motor A (Front Left)
+OUT3, OUT4      --> DC Motor B (Front Right)
+12V             --> External Power Supply (7-12V)
+GND             --> Power Supply GND & Pi GND (common ground)
+
+
+Raspberry Pi GPIO    L298N Motor Driver 2 (Rear Wheels)
+-----------------    ----------------------------------
+GPIO5            --> IN1
+GPIO6            --> IN2
+GPIO13           --> ENA (Enable C / PWM)
+GPIO19           --> IN3
+GPIO26           --> IN4
+GPIO12           --> ENB (Enable D / PWM)
+GND              --> GND
+
+L298N Driver 2      Motors & Power
+--------------      --------------
+OUT1, OUT2      --> DC Motor C (Rear Left)
+OUT3, OUT4      --> DC Motor D (Rear Right)
+12V             --> External Power Supply (7-12V)
+GND             --> Power Supply GND & Pi GND (common ground)
 ```
 
-### Configuration (config.h)
+**CRITICAL**: Ensure all grounds are connected together:
+- Raspberry Pi GND
+- L298N Driver 1 GND
+- L298N Driver 2 GND
+- Power Supply GND
 
-```cpp
-// Wi-Fi Configuration
-#define WIFI_SSID "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
-#define SERVER_HOST "192.168.1.100"  // Server IP address
-#define SERVER_PORT 8000
-#define WEBSOCKET_PATH "/ws/esp"
-
-// Network Configuration
-#define RECONNECT_DELAY_MS 5000
-#define HEARTBEAT_INTERVAL_MS 10000
-#define COMMAND_TIMEOUT_MS 5000
-
-// Motor Configuration
-#define DEFAULT_SPEED 200
-```
-
-### Required Libraries
-
-Install via Arduino Library Manager:
-- **WebSocketsClient** by Markus Sattler
-- **ArduinoJson** by Benoit Blanchon (version 6.x)
-
-### Key Functions
-
-#### Wi-Fi Connection
-
-```cpp
-void connectWiFi() {
-  Serial.println("Connecting to WiFi...");
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-    delay(500);
-    Serial.print(".");
-    attempts++;
-  }
-  
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\nWiFi connected");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
-  }
-}
-```
-
-#### WebSocket Event Handler
-
-```cpp
-void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
-  switch(type) {
-    case WStype_DISCONNECTED:
-      isConnected = false;
-      fallbackMode = true;
-      stopAllMotors();
-      break;
-      
-    case WStype_CONNECTED:
-      isConnected = true;
-      fallbackMode = false;
-      webSocket.sendTXT("{\"type\":\"esp_connected\"}");
-      break;
-      
-    case WStype_TEXT:
-      handleCommand(payload, length);
-      break;
-  }
-}
-```
-
-#### Command Handler
-
-```cpp
-void handleCommand(uint8_t * payload, size_t length) {
-  StaticJsonDocument<200> doc;
-  deserializeJson(doc, payload, length);
-  
-  const char* type = doc["type"];
-  
-  if (strcmp(type, "move") == 0) {
-    const char* direction = doc["direction"];
-    int speed = doc["speed"] | DEFAULT_SPEED;
-    
-    if (strcmp(direction, "forward") == 0) {
-      moveForward(speed);
-    } else if (strcmp(direction, "backward") == 0) {
-      moveBackward(speed);
-    } else if (strcmp(direction, "left") == 0) {
-      turnLeft(speed);
-    } else if (strcmp(direction, "right") == 0) {
-      turnRight(speed);
-    } else if (strcmp(direction, "stop") == 0) {
-      stopAllMotors();
-    }
-  }
-}
-```
-
-#### Motor Control
-
-```cpp
-void moveForward(int speed) {
-  digitalWrite(MOTOR_A_PIN1, HIGH);
-  digitalWrite(MOTOR_A_PIN2, LOW);
-  digitalWrite(MOTOR_B_PIN1, HIGH);
-  digitalWrite(MOTOR_B_PIN2, LOW);
-  
-  analogWrite(MOTOR_A_PWM, speed);
-  analogWrite(MOTOR_B_PWM, speed);
-}
-
-void moveBackward(int speed) {
-  digitalWrite(MOTOR_A_PIN1, LOW);
-  digitalWrite(MOTOR_A_PIN2, HIGH);
-  digitalWrite(MOTOR_B_PIN1, LOW);
-  digitalWrite(MOTOR_B_PIN2, HIGH);
-  
-  analogWrite(MOTOR_A_PWM, speed);
-  analogWrite(MOTOR_B_PWM, speed);
-}
-
-void turnLeft(int speed) {
-  digitalWrite(MOTOR_A_PIN1, LOW);
-  digitalWrite(MOTOR_A_PIN2, HIGH);
-  digitalWrite(MOTOR_B_PIN1, HIGH);
-  digitalWrite(MOTOR_B_PIN2, LOW);
-  
-  analogWrite(MOTOR_A_PWM, speed);
-  analogWrite(MOTOR_B_PWM, speed);
-}
-
-void turnRight(int speed) {
-  digitalWrite(MOTOR_A_PIN1, HIGH);
-  digitalWrite(MOTOR_A_PIN2, LOW);
-  digitalWrite(MOTOR_B_PIN1, LOW);
-  digitalWrite(MOTOR_B_PIN2, HIGH);
-  
-  analogWrite(MOTOR_A_PWM, speed);
-  analogWrite(MOTOR_B_PWM, speed);
-}
-
-void stopAllMotors() {
-  digitalWrite(MOTOR_A_PIN1, LOW);
-  digitalWrite(MOTOR_A_PIN2, LOW);
-  digitalWrite(MOTOR_B_PIN1, LOW);
-  digitalWrite(MOTOR_B_PIN2, LOW);
-  
-  analogWrite(MOTOR_A_PWM, 0);
-  analogWrite(MOTOR_B_PWM, 0);
-}
-```
-
-### Communication Protocol
-
-#### Messages from Server to ESP12E
-
-**Movement Command:**
-```json
-{
-  "type": "move",
-  "direction": "forward",
-  "speed": 200
-}
-```
-
-Directions: `forward`, `backward`, `left`, `right`, `stop`
-
-#### Messages from ESP12E to Server
-
-**Heartbeat:**
-```json
-{
-  "type": "heartbeat",
-  "device": "ESP12E",
-  "status": "normal",
-  "uptime": 12345
-}
-```
-
-**Sensor Data:**
-```json
-{
-  "type": "sensor",
-  "sensor": "touch",
-  "value": true
-}
-```
-
-**Status:**
-```json
-{
-  "type": "status",
-  "device": "ESP12E",
-  "connected": true
-}
-```
-
-### Fallback Mode
-
-When connection is lost or no commands received for 10+ seconds:
-- Automatically stops all motors
-- Sets `fallbackMode = true`
-- Continues attempting reconnection
-- Resumes normal operation when connection restored
-
----
-
-## Raspberry Pi Face Display & Audio Controller
-
-### Features
-
-- WebSocket connection to central server
-- Real-time face display rendering on HDMI
-- Audio output via audio jack
-- Emotion synchronization
-- Status reporting
-
-### Dependencies
-
-```bash
-# Install required packages
-sudo apt-get install -y python3-pip python3-websockets
-pip3 install websockets asyncio
-```
+This common ground is essential for proper signal communication.
 
 ### Configuration
+
+Update the `SERVER_URL` in `raspberry_pi_controller.py`:
 
 ```python
 # Server Configuration
 SERVER_URL = "ws://192.168.1.100:8000/ws/raspberry_pi"
 RECONNECT_DELAY = 5
 
-# GPIO Pin Definitions (for audio output)
-GPIO_I2S_BCK = 18
-GPIO_I2S_LRCK = 13
-GPIO_I2S_DATA = 12
+# PWM Configuration
+PWM_FREQUENCY = 1000  # 1kHz for smooth motor operation
+```
+
+### Dependencies
+
+```bash
+# Install required packages
+sudo apt-get update
+sudo apt-get install -y python3-pip python3-websockets python3-rpi.gpio
+pip3 install websockets asyncio
 ```
 
 ### Key Functions
+
+#### GPIO Initialization
+
+```python
+def _init_gpio(self):
+    """Initialize GPIO pins"""
+    if not self.GPIO:
+        return
+        
+    GPIO = self.GPIO
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setwarnings(False)
+    
+    # Motor Driver 1 (Motors A & B) - Setup as outputs
+    GPIO.setup(MOTOR_A_IN1, GPIO.OUT)
+    GPIO.setup(MOTOR_A_IN2, GPIO.OUT)
+    GPIO.setup(MOTOR_A_ENA, GPIO.OUT)
+    GPIO.setup(MOTOR_B_IN3, GPIO.OUT)
+    GPIO.setup(MOTOR_B_IN4, GPIO.OUT)
+    GPIO.setup(MOTOR_B_ENB, GPIO.OUT)
+    
+    # Motor Driver 2 (Motors C & D) - Setup as outputs
+    GPIO.setup(MOTOR_C_IN1, GPIO.OUT)
+    GPIO.setup(MOTOR_C_IN2, GPIO.OUT)
+    GPIO.setup(MOTOR_C_ENA, GPIO.OUT)
+    GPIO.setup(MOTOR_D_IN3, GPIO.OUT)
+    GPIO.setup(MOTOR_D_IN4, GPIO.OUT)
+    GPIO.setup(MOTOR_D_ENB, GPIO.OUT)
+```
+
+#### PWM Initialization
+
+```python
+def _init_motors(self):
+    """Initialize PWM for all 4 motors"""
+    if not self.GPIO:
+        return
+        
+    GPIO = self.GPIO
+    
+    # Create PWM instances for all motor enable pins
+    self.pwm_motors['A'] = GPIO.PWM(MOTOR_A_ENA, PWM_FREQUENCY)
+    self.pwm_motors['B'] = GPIO.PWM(MOTOR_B_ENB, PWM_FREQUENCY)
+    self.pwm_motors['C'] = GPIO.PWM(MOTOR_C_ENA, PWM_FREQUENCY)
+    self.pwm_motors['D'] = GPIO.PWM(MOTOR_D_ENB, PWM_FREQUENCY)
+    
+    # Start all PWM at 0% duty cycle (stopped)
+    for motor_name, pwm in self.pwm_motors.items():
+        pwm.start(0)
+```
 
 #### WebSocket Connection
 
@@ -343,23 +212,139 @@ async def handle_server_message(self, message: str):
     elif msg_type == "play_audio":
         audio_data = data.get("audio")
         await self.play_audio(audio_data)
+    
+    elif msg_type == "move":
+        direction = data.get("direction", "stop")
+        speed = data.get("speed", 75)
+        await self.handle_motor_command(direction, speed)
 ```
 
-#### Emotion & Face Updates
+#### Motor Control Functions
 
+**Forward Movement**:
 ```python
-async def update_emotion(self, emotion: str):
-    """Update robot's emotion and sync with display"""
-    self.current_emotion = emotion
-    logger.info(f"Emotion updated to: {emotion}")
+def _move_forward(self, duty_cycle: int):
+    """Move all 4 wheels forward"""
+    GPIO = self.GPIO
     
-    # Update face display
-    await self.display_face_animation({"emotion": emotion})
+    # All motors forward
+    GPIO.output(MOTOR_A_IN1, GPIO.HIGH)
+    GPIO.output(MOTOR_A_IN2, GPIO.LOW)
+    GPIO.output(MOTOR_B_IN3, GPIO.HIGH)
+    GPIO.output(MOTOR_B_IN4, GPIO.LOW)
+    GPIO.output(MOTOR_C_IN1, GPIO.HIGH)
+    GPIO.output(MOTOR_C_IN2, GPIO.LOW)
+    GPIO.output(MOTOR_D_IN3, GPIO.HIGH)
+    GPIO.output(MOTOR_D_IN4, GPIO.LOW)
+    
+    # Set speed for all motors
+    for pwm in self.pwm_motors.values():
+        pwm.ChangeDutyCycle(duty_cycle)
+```
+
+**Backward Movement**:
+```python
+def _move_backward(self, duty_cycle: int):
+    """Move all 4 wheels backward"""
+    GPIO = self.GPIO
+    
+    # All motors backward
+    GPIO.output(MOTOR_A_IN1, GPIO.LOW)
+    GPIO.output(MOTOR_A_IN2, GPIO.HIGH)
+    GPIO.output(MOTOR_B_IN3, GPIO.LOW)
+    GPIO.output(MOTOR_B_IN4, GPIO.HIGH)
+    GPIO.output(MOTOR_C_IN1, GPIO.LOW)
+    GPIO.output(MOTOR_C_IN2, GPIO.HIGH)
+    GPIO.output(MOTOR_D_IN3, GPIO.LOW)
+    GPIO.output(MOTOR_D_IN4, GPIO.HIGH)
+    
+    # Set speed for all motors
+    for pwm in self.pwm_motors.values():
+        pwm.ChangeDutyCycle(duty_cycle)
+```
+
+**Left Turn** (Tank-style):
+```python
+def _turn_left(self, duty_cycle: int):
+    """Turn left - left wheels backward, right wheels forward"""
+    GPIO = self.GPIO
+    
+    # Left motors backward
+    GPIO.output(MOTOR_A_IN1, GPIO.LOW)
+    GPIO.output(MOTOR_A_IN2, GPIO.HIGH)
+    GPIO.output(MOTOR_C_IN1, GPIO.LOW)
+    GPIO.output(MOTOR_C_IN2, GPIO.HIGH)
+    
+    # Right motors forward
+    GPIO.output(MOTOR_B_IN3, GPIO.HIGH)
+    GPIO.output(MOTOR_B_IN4, GPIO.LOW)
+    GPIO.output(MOTOR_D_IN3, GPIO.HIGH)
+    GPIO.output(MOTOR_D_IN4, GPIO.LOW)
+    
+    # Set speed for all motors
+    for pwm in self.pwm_motors.values():
+        pwm.ChangeDutyCycle(duty_cycle)
+```
+
+**Right Turn** (Tank-style):
+```python
+def _turn_right(self, duty_cycle: int):
+    """Turn right - right wheels backward, left wheels forward"""
+    GPIO = self.GPIO
+    
+    # Left motors forward
+    GPIO.output(MOTOR_A_IN1, GPIO.HIGH)
+    GPIO.output(MOTOR_A_IN2, GPIO.LOW)
+    GPIO.output(MOTOR_C_IN1, GPIO.HIGH)
+    GPIO.output(MOTOR_C_IN2, GPIO.LOW)
+    
+    # Right motors backward
+    GPIO.output(MOTOR_B_IN3, GPIO.LOW)
+    GPIO.output(MOTOR_B_IN4, GPIO.HIGH)
+    GPIO.output(MOTOR_D_IN3, GPIO.LOW)
+    GPIO.output(MOTOR_D_IN4, GPIO.HIGH)
+    
+    # Set speed for all motors
+    for pwm in self.pwm_motors.values():
+        pwm.ChangeDutyCycle(duty_cycle)
+```
+
+**Stop All Motors**:
+```python
+def _stop_all_motors(self):
+    """Stop all 4 motors"""
+    GPIO = self.GPIO
+    
+    # Set all direction pins LOW
+    GPIO.output(MOTOR_A_IN1, GPIO.LOW)
+    GPIO.output(MOTOR_A_IN2, GPIO.LOW)
+    GPIO.output(MOTOR_B_IN3, GPIO.LOW)
+    GPIO.output(MOTOR_B_IN4, GPIO.LOW)
+    GPIO.output(MOTOR_C_IN1, GPIO.LOW)
+    GPIO.output(MOTOR_C_IN2, GPIO.LOW)
+    GPIO.output(MOTOR_D_IN3, GPIO.LOW)
+    GPIO.output(MOTOR_D_IN4, GPIO.LOW)
+    
+    # Set all PWM to 0%
+    for pwm in self.pwm_motors.values():
+        pwm.ChangeDutyCycle(0)
 ```
 
 ### Communication Protocol
 
 #### Messages from Server to Raspberry Pi
+
+**Movement Command:**
+```json
+{
+  "type": "move",
+  "direction": "forward",
+  "speed": 75
+}
+```
+
+Directions: `forward`, `backward`, `left`, `right`, `stop`
+Speed: 0-100 (percentage, mapped to PWM duty cycle)
 
 **Emotion Update:**
 ```json
@@ -393,6 +378,14 @@ async def update_emotion(self, emotion: str):
 
 #### Messages from Raspberry Pi to Server
 
+**Connection:**
+```json
+{
+  "type": "raspberry_pi_connected",
+  "device": "RaspberryPi"
+}
+```
+
 **Status Update:**
 ```json
 {
@@ -407,76 +400,87 @@ async def update_emotion(self, emotion: str):
 
 ## Testing Hardware Code
 
-### ESP12E Testing
-
-1. **Upload and Monitor:**
-   ```bash
-   # In Arduino IDE
-   - Upload sketch
-   - Open Serial Monitor (115200 baud)
-   - Watch for connection messages
-   ```
-
-2. **Expected Output:**
-   ```
-   ESP12E Motor Controller Initialized
-   Connecting to WiFi...
-   WiFi connected
-   IP address: 192.168.1.101
-   WebSocket client initialized
-   WebSocket Connected
-   ```
-
-3. **Test Commands:**
-   Send from server or use API:
-   ```bash
-   curl -X POST http://192.168.1.100:8000/api/command \
-     -H "Content-Type: application/json" \
-     -d '{"type":"move","direction":"forward","speed":200}'
-   ```
-
-### Raspberry Pi Testing
+### Raspberry Pi Motor Control Testing
 
 1. **Run Controller:**
    ```bash
+   cd hardware/raspberry_pi
    python3 raspberry_pi_controller.py
    ```
 
 2. **Expected Output:**
    ```
-   INFO - Raspberry Pi Controller Initialized
+   INFO - Raspberry Pi Controller Initialized with 4-wheel motor control
+   INFO - GPIO pins initialized for 4-wheel motor control
+   INFO - PWM initialized for all 4 motors at 1000Hz
    INFO - Connected to server
    ```
 
-3. **Test Emotion Update:**
+3. **Test Motor Commands:**
+   Send from server or use API:
+   ```bash
+   # Test forward movement
+   curl -X POST http://192.168.1.100:8000/api/command \
+     -H "Content-Type: application/json" \
+     -d '{"type":"move","direction":"forward","speed":75}'
+   
+   # Test backward movement
+   curl -X POST http://192.168.1.100:8000/api/command \
+     -H "Content-Type: application/json" \
+     -d '{"type":"move","direction":"backward","speed":75}'
+   
+   # Test left turn
+   curl -X POST http://192.168.1.100:8000/api/command \
+     -H "Content-Type: application/json" \
+     -d '{"type":"move","direction":"left","speed":75}'
+   
+   # Test right turn
+   curl -X POST http://192.168.1.100:8000/api/command \
+     -H "Content-Type: application/json" \
+     -d '{"type":"move","direction":"right","speed":75}'
+   
+   # Stop motors
+   curl -X POST http://192.168.1.100:8000/api/command \
+     -H "Content-Type: application/json" \
+     -d '{"type":"move","direction":"stop","speed":0}'
+   ```
+
+4. **Test Emotion Update:**
    ```bash
    curl -X POST http://192.168.1.100:8000/api/command \
      -H "Content-Type: application/json" \
      -d '{"type":"emotion","emotion":"happy"}'
    ```
 
+### PWM Testing
+
+Test different speed levels to ensure smooth operation:
+
+```bash
+# Low speed (25%)
+curl -X POST http://192.168.1.100:8000/api/command \
+  -H "Content-Type: application/json" \
+  -d '{"type":"move","direction":"forward","speed":25}'
+
+# Medium speed (50%)
+curl -X POST http://192.168.1.100:8000/api/command \
+  -H "Content-Type: application/json" \
+  -d '{"type":"move","direction":"forward","speed":50}'
+
+# High speed (75%)
+curl -X POST http://192.168.1.100:8000/api/command \
+  -H "Content-Type: application/json" \
+  -d '{"type":"move","direction":"forward","speed":75}'
+
+# Maximum speed (100%)
+curl -X POST http://192.168.1.100:8000/api/command \
+  -H "Content-Type: application/json" \
+  -d '{"type":"move","direction":"forward","speed":100}'
+```
+
 ---
 
 ## Troubleshooting
-
-### ESP12E Issues
-
-**Won't Connect to Wi-Fi:**
-- Check SSID and password in config.h
-- Verify ESP12E is in range of Wi-Fi
-- Check serial monitor for error messages
-
-**Motors Don't Move:**
-- Verify L298N connections
-- Check power supply (7-12V, sufficient current)
-- Test motors directly with power supply
-- Monitor serial output for command receipt
-
-**WebSocket Won't Connect:**
-- Verify server IP in config.h
-- Check server is running: `curl http://server:8000/health`
-- Check firewall allows port 8000
-- Monitor server logs for connection attempts
 
 ### Raspberry Pi Issues
 
@@ -485,16 +489,58 @@ async def update_emotion(self, emotion: str):
 - Test network: `ping server-ip`
 - Check websockets library: `python3 -c "import websockets"`
 - Check server logs
+- Ensure server is running: `curl http://server:8000/health`
+
+**GPIO Errors:**
+- Verify RPi.GPIO is installed: `python3 -c "import RPi.GPIO"`
+- Install if missing: `sudo apt-get install python3-rpi.gpio`
+- Check GPIO permissions: `sudo usermod -a -G gpio $USER`
+- Run with sudo if needed: `sudo python3 raspberry_pi_controller.py`
+
+**Motors Don't Move:**
+- Verify L298N connections to GPIO pins
+- Check power supply (7-12V, sufficient current - at least 2A per driver)
+- Test motors directly with power supply
+- Verify all grounds are connected together
+- Check GPIO pin numbers match configuration
+- Monitor Raspberry Pi logs for command receipt
+- Use multimeter to check GPIO output voltage
+
+**Motors Move Erratically:**
+- Check power supply capacity (motors may draw high current)
+- Verify PWM frequency (should be 1kHz)
+- Check for loose connections
+- Ensure common ground connection
+- Test with lower speeds first
+
+**One or More Motors Not Working:**
+- Check individual L298N driver connections
+- Verify motor wiring (OUT1/OUT2 pairs)
+- Test motor directly with power supply
+- Check specific GPIO pins with `gpio readall`
+- Verify PWM signal on ENA/ENB pins
 
 **Audio Not Working:**
 - Verify audio jack is connected
 - Test with: `speaker-test -t wav -c 2`
 - Check audio output device: `aplay -l`
+- Adjust volume: `alsamixer`
 
 **Display Issues:**
 - Verify HDMI connection
 - Check display resolution settings
-- Test with simple graphics library
+- Test with simple graphics: `fbset`
+
+---
+
+## Safety Considerations
+
+1. **Power Supply**: Use appropriate voltage (7-12V) and sufficient current capacity for motors
+2. **Common Ground**: Always connect all grounds together
+3. **Motor Stall**: Avoid stalling motors for extended periods (overheating risk)
+4. **Emergency Stop**: Implement physical emergency stop button
+5. **Connection Loss**: Motors automatically stop if connection is lost
+6. **Testing**: Start with low speeds (25-50%) during initial testing
 
 ---
 
@@ -502,24 +548,38 @@ async def update_emotion(self, emotion: str):
 
 ### Ultrasonic Sensor Support
 
-Can be added to ESP12E for obstacle detection:
+Can be added to Raspberry Pi GPIO for obstacle detection:
 
-```cpp
-#define DISTANCE_TRIG D8
-#define DISTANCE_ECHO D4
+```python
+import time
 
-float readDistance() {
-  digitalWrite(DISTANCE_TRIG, LOW);
-  delayMicroseconds(2);
-  digitalWrite(DISTANCE_TRIG, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(DISTANCE_TRIG, LOW);
-  
-  long duration = pulseIn(DISTANCE_ECHO, HIGH);
-  float distance = (duration * 0.034) / 2;
-  
-  return distance;
-}
+TRIG_PIN = 16
+ECHO_PIN = 20
+
+def setup_ultrasonic():
+    GPIO.setup(TRIG_PIN, GPIO.OUT)
+    GPIO.setup(ECHO_PIN, GPIO.IN)
+
+def read_distance():
+    # Send trigger pulse
+    GPIO.output(TRIG_PIN, GPIO.LOW)
+    time.sleep(0.000002)
+    GPIO.output(TRIG_PIN, GPIO.HIGH)
+    time.sleep(0.00001)
+    GPIO.output(TRIG_PIN, GPIO.LOW)
+    
+    # Measure echo time
+    while GPIO.input(ECHO_PIN) == 0:
+        pulse_start = time.time()
+    
+    while GPIO.input(ECHO_PIN) == 1:
+        pulse_end = time.time()
+    
+    pulse_duration = pulse_end - pulse_start
+    distance = pulse_duration * 17150  # Speed of sound
+    distance = round(distance, 2)
+    
+    return distance
 ```
 
 Report to server:
@@ -533,11 +593,15 @@ Report to server:
 
 ### IMU/Gyroscope
 
-Could be added for orientation sensing and better navigation.
+Could be added via I2C for orientation sensing and better navigation.
 
 ### Camera Integration
 
-Could be added to Raspberry Pi for vision-based features.
+Could be added to Raspberry Pi via CSI or USB for vision-based features.
+
+### Encoder Support
+
+Add rotary encoders to motors for precise position control and odometry.
 
 ---
 
@@ -545,8 +609,7 @@ Could be added to Raspberry Pi for vision-based features.
 
 The complete, up-to-date code is available in the repository:
 
-- **ESP12E**: `hardware/esp12e/motor_controller.ino` and `config.h`
-- **Raspberry Pi**: `hardware/raspberry_pi/raspberry_pi_controller.py`
+- **Raspberry Pi Controller**: `hardware/raspberry_pi/raspberry_pi_controller.py`
 - **Server**: `server/server.py`
 
 Refer to these files for the most current implementation.
