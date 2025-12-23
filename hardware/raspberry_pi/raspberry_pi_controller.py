@@ -244,7 +244,13 @@ class RaspberryPiController:
             }
     
     async def handle_motor_command(self, direction: str, speed: int):
-        """Handle motor control commands for 4-wheel setup"""
+        """
+        Handle motor control commands for 4-wheel setup.
+        
+        Args:
+            direction (str): Movement direction - 'forward', 'backward', 'left', 'right', or 'stop'
+            speed (int): Speed percentage (0-100), mapped to PWM duty cycle
+        """
         if not self.GPIO:
             logger.warning("GPIO not available - motor command ignored")
             return
@@ -272,7 +278,12 @@ class RaspberryPiController:
                 logger.warning(f"Unknown direction: {direction}")
     
     def _move_forward(self, duty_cycle: int):
-        """Move all 4 wheels forward"""
+        """
+        Move all 4 wheels forward.
+        
+        Args:
+            duty_cycle (int): PWM duty cycle percentage (0-100)
+        """
         if not self.GPIO:
             return
         
@@ -301,7 +312,12 @@ class RaspberryPiController:
         logger.debug(f"Moving forward at {duty_cycle}% speed")
     
     def _move_backward(self, duty_cycle: int):
-        """Move all 4 wheels backward"""
+        """
+        Move all 4 wheels backward.
+        
+        Args:
+            duty_cycle (int): PWM duty cycle percentage (0-100)
+        """
         if not self.GPIO:
             return
         
@@ -330,7 +346,12 @@ class RaspberryPiController:
         logger.debug(f"Moving backward at {duty_cycle}% speed")
     
     def _turn_left(self, duty_cycle: int):
-        """Turn left - left wheels backward, right wheels forward"""
+        """
+        Turn left using tank-style steering - left wheels backward, right wheels forward.
+        
+        Args:
+            duty_cycle (int): PWM duty cycle percentage (0-100)
+        """
         if not self.GPIO:
             return
         
@@ -359,7 +380,12 @@ class RaspberryPiController:
         logger.debug(f"Turning left at {duty_cycle}% speed")
     
     def _turn_right(self, duty_cycle: int):
-        """Turn right - right wheels backward, left wheels forward"""
+        """
+        Turn right using tank-style steering - right wheels backward, left wheels forward.
+        
+        Args:
+            duty_cycle (int): PWM duty cycle percentage (0-100)
+        """
         if not self.GPIO:
             return
         

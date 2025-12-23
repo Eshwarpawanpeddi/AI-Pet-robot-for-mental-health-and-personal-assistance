@@ -10,6 +10,7 @@ import sys
 import json
 
 # Configuration
+# IMPORTANT: Update this IP address to match your server's IP address
 SERVER_URL = "http://192.168.1.100:8000"  # Update with your server IP
 TEST_DELAY = 3  # seconds between tests
 SPEEDS = [25, 50, 75, 100]  # Speed levels to test
@@ -36,7 +37,17 @@ def stop_motors():
     return send_command("stop", 0)
 
 def test_health():
-    """Test server health endpoint"""
+    """
+    Test server health endpoint and verify Raspberry Pi connection.
+    
+    Returns:
+        bool: True if server is healthy and Raspberry Pi is connected, False otherwise.
+    
+    Validates:
+        - Server is accessible and responding
+        - Server reports healthy status
+        - Raspberry Pi WebSocket connection is established
+    """
     try:
         response = requests.get(f"{SERVER_URL}/health", timeout=5)
         response.raise_for_status()
