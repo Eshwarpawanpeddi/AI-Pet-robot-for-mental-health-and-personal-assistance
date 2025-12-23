@@ -424,13 +424,11 @@ AI-Pet-robot-for-mental-health-and-personal-assistance/
 │   ├── face_display.html      # Animated face display
 │   └── styles.css             # Styling
 ├── hardware/
-│   ├── raspberry_pi/          # Raspberry Pi controller
-│   │   ├── raspberry_pi_controller.py
-│   │   ├── config.yaml        # Hardware configuration
-│   │   └── requirements.txt
-│   └── esp12e/                # ESP12E firmware
-│       ├── motor_controller.ino
-│       └── config.h           # Pin definitions
+│   └── raspberry_pi/          # Raspberry Pi controller
+│       ├── raspberry_pi_controller.py  # Main controller with motor control
+│       ├── test_motors.py     # Motor testing script
+│       ├── config.yaml        # Hardware configuration
+│       └── requirements.txt
 ├── mobile_app/                 # Mobile App (Flutter) (NEW)
 │   ├── lib/
 │   │   ├── main.dart          # App entry point
@@ -459,6 +457,7 @@ AI-Pet-robot-for-mental-health-and-personal-assistance/
 │   ├── robot-architecture.md
 │   ├── api-integration.md
 │   ├── hardware-code.md
+│   ├── 4-wheel-setup-guide.md  # NEW: 4-wheel setup guide
 │   └── face-display.md
 ├── docker-compose.yml         # Docker Compose configuration
 ├── .env.example              # Environment template
@@ -562,6 +561,7 @@ controller.stop()
 
 - **[Mental Health Features](MENTAL_HEALTH_FEATURES.md)** - Comprehensive mental health support documentation
 - **[Multimodal API Guide](downloads/multimodal-api-guide.md)** - Complete guide for multimodal interactions
+- **[4-Wheel Setup Guide](downloads/4-wheel-setup-guide.md)** - Detailed setup guide for 4-wheel motor control
 - [Setup Guide](downloads/setup-guide.md) - Detailed setup instructions
 - [Architecture](downloads/robot-architecture.md) - System architecture details
 - [API Integration](downloads/api-integration.md) - API documentation
