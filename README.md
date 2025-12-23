@@ -71,61 +71,62 @@ This robot is designed to:
 │  └────────────────────────────────────────┘  │
 │  ┌────────────────────────────────────────┐  │
 │  │ WebSocket Hub & Command Routing         │  │
-│  │ - ESP12E Motor Commands (Wi-Fi)         │  │
-│  │ - Raspberry Pi Face/Audio (Wi-Fi)       │  │
+│  │ - Raspberry Pi Motor & Face (Wi-Fi)     │  │
 │  │ - Mobile App Control (WebSocket)        │  │
 │  │ - Mode Toggle (Manual/Autonomous)       │  │
 │  └────────────────────────────────────────┘  │
-└──────────────┬───────────────────┬───────────┘
-               │                   │
-      WebSocket│                   │WebSocket
-      (Wi-Fi) │                   │(Wi-Fi)
-               │                   │
-      ┌────────▼────────┐ ┌────────▼─────────────┐
-      │                 │ │                      │
-      ▼                 │ ▼                      │
-┌─────────────────┐     │ ┌────────────────────────┐
-│   ESP12E        │     │ │   RASPBERRY PI 4       │
-│ (Motor Control) │     │ │  (Face & Audio Hub)    │
-│  ┌──────────┐   │     │ │  ┌──────────────────┐  │
-│  │ Wi-Fi    │   │     │ │  │ HDMI Face Display│  │
-│  │WebSocket │   │     │ │  │ Real-time Render │  │
-│  └──────────┘   │     │ │  └──────────────────┘  │
-│  ┌──────────┐   │     │ │  ┌──────────────────┐  │
-│  │Motor Ctrl│   │     │ │  │Audio Output      │  │
-│  │PWM+Dir   │   │     │ │  │(Audio Jack)      │  │
-│  └────┬─────┘   │     │ │  └──────────────────┘  │
-└───────┼─────────┘     │ └────────────────────────┘
-        │               │
-        │               │
-   ┌────▼──────────┐    │
-   │ L298N Driver  │    │
-   └────┬──────────┘    │
-        │               │
-   ┌────┴────┬─────┐    │
-   │         │     │    │
-   ▼         ▼     ▼    │
-Motor A   Motor B  Servo(s)
+└──────────────┬───────────────────────────────┘
+               │
+      WebSocket│
+       (Wi-Fi)│
+               │
+       ┌───────▼────────────────────┐
+       │   RASPBERRY PI 4           │
+       │  (Motor Control & Display) │
+       │  ┌──────────────────────┐  │
+       │  │ GPIO Motor Control   │  │
+       │  │ 2x L298N Drivers     │  │
+       │  │ 4-Wheel Setup        │  │
+       │  └──────────────────────┘  │
+       │  ┌──────────────────────┐  │
+       │  │ HDMI Face Display    │  │
+       │  │ Real-time Render     │  │
+       │  └──────────────────────┘  │
+       │  ┌──────────────────────┐  │
+       │  │ Audio Output         │  │
+       │  │ (Audio Jack)         │  │
+       │  └──────────────────────┘  │
+       └─────────┬──────────────────┘
+                 │
+          ┌──────┴──────┐
+          │             │
+    ┌─────▼────┐  ┌────▼─────┐
+    │ L298N #1 │  │ L298N #2 │
+    └─────┬────┘  └────┬─────┘
+          │            │
+      ┌───┴───┐    ┌───┴───┐
+      │       │    │       │
+      ▼       ▼    ▼       ▼
+   Motor A Motor B Motor C Motor D
+   (Front L)(Front R)(Rear L)(Rear R)
 ```
 
 ## 📋 Prerequisites
 
 ### Hardware Requirements
 - **Central Server**: Laptop or Desktop (Linux/Windows/Mac) or Cloud Server
-- **Raspberry Pi 4** (4GB+ recommended) - For face display and audio
-- **ESP12E (NodeMCU)** microcontroller - For motor control
-- **L298N Motor Driver**
-- **DC Motors** (2x) for movement
+- **Raspberry Pi 4** (4GB+ recommended) - For motor control, face display, and audio
+- **2x L298N Motor Driver** - For controlling 4 DC motors
+- **DC Motors** (4x) for 4-wheel movement
 - **HDMI Display** connected to Raspberry Pi for face animations
 - **Speaker/Audio Output** via Raspberry Pi audio jack
-- **Wi-Fi Router** - All components must be on same network
-- **Power supplies**: 5V for Pi, appropriate voltage for motors
+- **Wi-Fi Router** - Server and Raspberry Pi must be on same network
+- **Power supplies**: 5V for Pi, appropriate voltage (7-12V) for motors
 - **Optional**: Touch sensors, ultrasonic distance sensor (for future expansion)
 
 ### Software Requirements
 - Python 3.9+
 - Docker and Docker Compose (for server - optional)
-- Arduino IDE (for ESP12E programming)
 - Flutter SDK (for mobile app - optional)
 - Node.js 18+ (for mobile app development - optional)
 - **ROS Noetic** (Ubuntu 20.04) or **ROS Melodic** (Ubuntu 18.04) - **Optional for autonomous mode**
@@ -182,7 +183,7 @@ cd hardware/raspberry_pi
 
 # Install dependencies
 sudo apt-get update
-sudo apt-get install -y python3-pip python3-websockets
+sudo apt-get install -y python3-pip python3-websockets python3-rpi.gpio
 pip3 install websockets asyncio
 
 # Update the SERVER_URL in raspberry_pi_controller.py
@@ -196,38 +197,38 @@ python3 raspberry_pi_controller.py
 
 **Note**: The Raspberry Pi will:
 - Connect to the central server via WebSocket
+- Control 4 DC motors via 2 L298N motor drivers using GPIO
 - Render face animations on HDMI display
 - Play audio through the audio jack
-- Receive emotion updates in real-time
+- Receive emotion and motor control updates in real-time
 
-### 4. ESP12E Setup
+**GPIO Pin Configuration**:
+The Raspberry Pi uses the following GPIO pins for motor control:
 
-1. Open Arduino IDE
-2. Install ESP8266 board support:
-   - Go to **File → Preferences**
-   - Add to "Additional Boards Manager URLs": 
-     ```
-     http://arduino.esp8266.com/stable/package_esp8266com_index.json
-     ```
-3. Install ESP8266 from **Tools → Board → Boards Manager**
-4. Install required libraries:
-   - **WebSocketsClient** by Markus Sattler
-   - **ArduinoJson** by Benoit Blanchon
-5. Open `hardware/esp12e/motor_controller.ino`
-6. Edit `hardware/esp12e/config.h`:
-   - Set `WIFI_SSID` to your Wi-Fi network name
-   - Set `WIFI_PASSWORD` to your Wi-Fi password
-   - Set `SERVER_HOST` to your server's IP address
-7. Select **Tools → Board → NodeMCU 1.0 (ESP-12E Module)**
-8. Upload the sketch to ESP12E
+**Motor Driver 1 (Motors A & B - Front Wheels)**:
+- GPIO17 → Motor A IN1 (Direction 1)
+- GPIO27 → Motor A IN2 (Direction 2)
+- GPIO22 → Motor A ENA (PWM Speed Control)
+- GPIO23 → Motor B IN3 (Direction 1)
+- GPIO24 → Motor B IN4 (Direction 2)
+- GPIO25 → Motor B ENB (PWM Speed Control)
 
-**Note**: The ESP12E will:
-- Connect to Wi-Fi automatically on startup
-- Establish WebSocket connection to server
-- Receive motor commands and execute them
-- Enter fallback mode (auto-stop) if connection drops
+**Motor Driver 2 (Motors C & D - Rear Wheels)**:
+- GPIO5 → Motor C IN1 (Direction 1)
+- GPIO6 → Motor C IN2 (Direction 2)
+- GPIO13 → Motor C ENA (PWM Speed Control)
+- GPIO19 → Motor D IN3 (Direction 1)
+- GPIO26 → Motor D IN4 (Direction 2)
+- GPIO12 → Motor D ENB (PWM Speed Control)
 
-### 5. Access the Web Interface
+**Wiring Instructions**:
+1. Connect Raspberry Pi GPIO pins to L298N driver inputs as shown above
+2. Connect L298N OUT1/OUT2 to Motor A, OUT3/OUT4 to Motor B (Driver 1)
+3. Connect L298N OUT1/OUT2 to Motor C, OUT3/OUT4 to Motor D (Driver 2)
+4. Power both L298N drivers with 7-12V supply
+5. Connect all grounds together (Pi GND, both L298N GND, power supply GND)
+
+### 4. Access the Web Interface
 
 Open your browser and navigate to:
 ```
@@ -530,28 +531,24 @@ controller.stop()
 - Ensure port 8000 is not in use
 - Check logs: `docker-compose logs robot-server`
 
-### ESP12E Not Connecting
-
-- Verify Wi-Fi credentials in `config.h`
-- Check if ESP12E is on the same network as server
-- Verify server IP address in `config.h`
-- Check server logs for WebSocket connection attempts
-- Monitor ESP12E serial output for connection status
-
 ### Raspberry Pi Not Connecting
 
 - Verify server URL in `raspberry_pi_controller.py`
 - Check network connectivity: `ping <server_ip>`
 - Ensure WebSocket port 8000 is accessible
 - Check server logs for Raspberry Pi connection attempts
+- Verify RPi.GPIO library is installed: `python3 -c "import RPi.GPIO"`
 
 ### Motors Not Moving
 
-- Check ESP12E WebSocket connection status
-- Verify motor driver (L298N) connections
-- Test motor driver with known good motors
-- Check power supply voltage and current
-- Monitor ESP12E serial output for command receipt
+- Check Raspberry Pi WebSocket connection status
+- Verify motor driver (L298N) connections to GPIO pins
+- Check power supply voltage (7-12V) and current capacity
+- Test motors directly with power supply
+- Verify GPIO pin numbers match configuration
+- Check server logs for motor command transmission
+- Monitor Raspberry Pi logs for command receipt
+- Ensure all grounds are connected properly
 
 ### WebSocket Connection Failed
 
