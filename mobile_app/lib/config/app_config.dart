@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 class AppConfig {
   // Server Configuration
   static const String baseUrl = "http://10.44.35.29:8000"; // Your Laptop IP

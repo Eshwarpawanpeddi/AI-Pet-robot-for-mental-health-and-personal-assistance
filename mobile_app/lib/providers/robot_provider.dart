@@ -5,6 +5,7 @@ import '../models/mood_log.dart';
 import '../services/websocket_service.dart';
 import '../services/api_service.dart';
 import '../config/app_config.dart';
+import 'dart:convert';
 
 class RobotProvider with ChangeNotifier {
   final WebSocketService _wsService = WebSocketService();
@@ -217,32 +218,31 @@ class RobotProvider with ChangeNotifier {
 
   // Storage Methods
   Future<void> _loadMoodLogs() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final logsJson = prefs.getStringList(AppConfig.keyMoodLogs) ?? [];
-      
-      _moodLogs = logsJson
-          .map((json) => MoodLog.fromJson(Map<String, dynamic>.from(
-              const JsonDecoder().convert(json))))
-          .toList();
-    } catch (e) {
-      print('Error loading mood logs: $e');
-    }
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final logsJson = prefs.getStringList(AppConfig.keyMoodLogs) ?? [];
+
+    _moodLogs = logsJson
+        .map((jsonStr) => MoodLog.fromJson(jsonDecode(jsonStr))) // Use jsonDecode directly
+        .toList();
+  } catch (e) {
+    print('Error loading mood logs: $e');
   }
+}
 
   Future<void> _saveMoodLogs() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final logsJson = _moodLogs
-          .take(100) // Keep only last 100 logs
-          .map((log) => const JsonEncoder().convert(log.toJson()))
-          .toList();
-      
-      await prefs.setStringList(AppConfig.keyMoodLogs, logsJson);
-    } catch (e) {
-      print('Error saving mood logs: $e');
-    }
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final List<String> logsJson = _moodLogs // Explicitly define as List<String>
+        .take(100)
+        .map((log) => jsonEncode(log.toJson())) // Use jsonEncode directly
+        .toList();
+
+    await prefs.setStringList(AppConfig.keyMoodLogs, logsJson);
+  } catch (e) {
+    print('Error saving mood logs: $e');
   }
+}
 
   void clearError() {
     _errorMessage = null;

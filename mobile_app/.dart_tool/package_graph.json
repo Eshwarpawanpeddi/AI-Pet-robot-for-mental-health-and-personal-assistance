@@ -74,17 +74,16 @@
     },
     {
       "name": "speech_to_text",
-      "version": "6.6.0",
+      "version": "7.4.0-beta.8",
       "dependencies": [
         "clock",
         "flutter",
         "flutter_web_plugins",
-        "js",
         "json_annotation",
         "meta",
-        "pedantic",
-        "speech_to_text_macos",
-        "speech_to_text_platform_interface"
+        "speech_to_text_platform_interface",
+        "speech_to_text_windows",
+        "web"
       ]
     },
     {
@@ -179,12 +178,11 @@
     },
     {
       "name": "web_socket_channel",
-      "version": "2.4.5",
+      "version": "2.4.0",
       "dependencies": [
         "async",
         "crypto",
-        "stream_channel",
-        "web"
+        "stream_channel"
       ]
     },
     {
@@ -346,15 +344,16 @@
       ]
     },
     {
-      "name": "js",
-      "version": "0.6.7",
+      "name": "speech_to_text_windows",
+      "version": "1.0.1-beta.16",
       "dependencies": [
-        "meta"
+        "flutter",
+        "speech_to_text_platform_interface"
       ]
     },
     {
-      "name": "pedantic",
-      "version": "1.11.1",
+      "name": "web",
+      "version": "1.1.1",
       "dependencies": []
     },
     {
@@ -365,17 +364,8 @@
       ]
     },
     {
-      "name": "speech_to_text_macos",
-      "version": "1.1.0",
-      "dependencies": [
-        "flutter",
-        "plugin_platform_interface",
-        "speech_to_text_platform_interface"
-      ]
-    },
-    {
       "name": "speech_to_text_platform_interface",
-      "version": "2.3.0",
+      "version": "2.4.0-beta.2",
       "dependencies": [
         "flutter",
         "meta",
@@ -630,11 +620,6 @@
       ]
     },
     {
-      "name": "web",
-      "version": "0.5.1",
-      "dependencies": []
-    },
-    {
       "name": "http_parser",
       "version": "4.1.2",
       "dependencies": [
@@ -790,6 +775,13 @@
       "dependencies": [
         "flutter",
         "path_provider_platform_interface"
+      ]
+    },
+    {
+      "name": "js",
+      "version": "0.6.7",
+      "dependencies": [
+        "meta"
       ]
     },
     {

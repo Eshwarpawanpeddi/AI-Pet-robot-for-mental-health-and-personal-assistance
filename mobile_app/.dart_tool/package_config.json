@@ -320,12 +320,6 @@
       "languageVersion": "3.2"
     },
     {
-      "name": "pedantic",
-      "rootUri": "file:///C:/Users/Shruthi/AppData/Local/Pub/Cache/hosted/pub.dev/pedantic-1.11.1",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
-    },
-    {
       "name": "permission_handler",
       "rootUri": "file:///C:/Users/Shruthi/AppData/Local/Pub/Cache/hosted/pub.dev/permission_handler-11.4.0",
       "packageUri": "lib/",
@@ -447,19 +441,19 @@
     },
     {
       "name": "speech_to_text",
-      "rootUri": "file:///C:/Users/Shruthi/AppData/Local/Pub/Cache/hosted/pub.dev/speech_to_text-6.6.0",
+      "rootUri": "file:///C:/Users/Shruthi/AppData/Local/Pub/Cache/hosted/pub.dev/speech_to_text-7.4.0-beta.8",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
-    },
-    {
-      "name": "speech_to_text_macos",
-      "rootUri": "file:///C:/Users/Shruthi/AppData/Local/Pub/Cache/hosted/pub.dev/speech_to_text_macos-1.1.0",
-      "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.3"
     },
     {
       "name": "speech_to_text_platform_interface",
-      "rootUri": "file:///C:/Users/Shruthi/AppData/Local/Pub/Cache/hosted/pub.dev/speech_to_text_platform_interface-2.3.0",
+      "rootUri": "file:///C:/Users/Shruthi/AppData/Local/Pub/Cache/hosted/pub.dev/speech_to_text_platform_interface-2.4.0-beta.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "speech_to_text_windows",
+      "rootUri": "file:///C:/Users/Shruthi/AppData/Local/Pub/Cache/hosted/pub.dev/speech_to_text_windows-1.0.1-beta.16",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },
@@ -543,15 +537,15 @@
     },
     {
       "name": "web",
-      "rootUri": "file:///C:/Users/Shruthi/AppData/Local/Pub/Cache/hosted/pub.dev/web-0.5.1",
+      "rootUri": "file:///C:/Users/Shruthi/AppData/Local/Pub/Cache/hosted/pub.dev/web-1.1.1",
       "packageUri": "lib/",
-      "languageVersion": "3.3"
+      "languageVersion": "3.4"
     },
     {
       "name": "web_socket_channel",
-      "rootUri": "file:///C:/Users/Shruthi/AppData/Local/Pub/Cache/hosted/pub.dev/web_socket_channel-2.4.5",
+      "rootUri": "file:///C:/Users/Shruthi/AppData/Local/Pub/Cache/hosted/pub.dev/web_socket_channel-2.4.0",
       "packageUri": "lib/",
-      "languageVersion": "3.3"
+      "languageVersion": "2.15"
     },
     {
       "name": "xdg_directories",

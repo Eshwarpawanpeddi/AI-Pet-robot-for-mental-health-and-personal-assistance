@@ -36,7 +36,7 @@ dependencies:
   permission_handler: ^11.1.0
   
   # Speech
-  speech_to_text: ^6.5.1
+  speech_to_text: ^7.3.1
   flutter_tts: ^3.8.5
   
   # Icons & UI
