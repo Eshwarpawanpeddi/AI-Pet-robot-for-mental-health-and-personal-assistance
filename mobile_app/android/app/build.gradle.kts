@@ -1,12 +1,11 @@
 plugins {
     id("com.android.application")
-    id("kotlin-android")
-    // This line MUST have parentheses to link the Flutter SDK
+    // Use the explicit ID that matches your settings file
+    id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
-    // This must match your package name exactly
     namespace = "com.petrobot.ai_pet_robot"
     compileSdk = 34
 
@@ -21,10 +20,17 @@ android {
 
     defaultConfig {
         applicationId = "com.petrobot.ai_pet_robot"
-        minSdk = flutter.minSdkVersion 
+        // Hardcoding these for now to bypass potential plugin resolution issues
+        minSdk = flutter.minSdkVersion
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
+    }
+
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
 }
 
