@@ -2,457 +2,187 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pet Robot Face - Gemini Live</title>
+    <title>Pet Robot Face - Expressive Cute Eyes</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        .face-canvas { 
+            background: #000; 
+            border: 8px solid #222; 
+            border-radius: 60px; 
+            box-shadow: 0 0 40px rgba(0,0,0,0.8);
+        }
+        .robot-container { 
+            background: rgba(0,0,0,0.3); 
+            padding: 30px; 
+            border-radius: 50px;
+        }
+    </style>
 </head>
 <body>
     <div class="robot-container">
-        <canvas id="faceCanvas" class="face-canvas" width="500" height="500"></canvas>
+        <canvas id="faceCanvas" class="face-canvas" width="500" height="400"></canvas>
         
         <div class="status-bar">
-            <div class="status-item">
-                <span class="status-indicator active" id="listenIndicator"></span>
-                Listening
-            </div>
-            <div class="status-item">
-                <span class="status-indicator inactive" id="speakIndicator"></span>
-                Speaking
-            </div>
-            <div class="status-item">
-                Battery: <span id="batteryLevel">100</span>%
-            </div>
-            <div class="emotion-display" id="emotionDisplay">Neutral</div>
+            <div class="status-item">User Feel: <span id="userEmotion" style="color:#4ade80">Neutral</span></div>
+            <div class="status-item">Robot Feel: <span id="robotEmotion" style="color:#fbbf24">Neutral</span></div>
+            <div class="status-item">Battery: <span id="batteryLevel">100</span>%</div>
         </div>
 
         <div class="control-panel">
-            <button class="btn" onclick="toggleListening()">🎤 Listen</button>
-            <button class="btn" onclick="sendCommand('forward')">⬆️ Forward</button>
-            <button class="btn" onclick="sendCommand('stop')">⏹️ Stop</button>
+            <button class="btn" onclick="sendText('How are you?')">👋 Say Hello</button>
             <button class="btn" onclick="changeEmotion('happy')">😊 Happy</button>
+            <button class="btn" onclick="changeEmotion('sad')">😢 Sad (Cry)</button>
+            <button class="btn" onclick="changeEmotion('angry')">💢 Angry</button>
+            <button class="btn" onclick="changeEmotion('neutral')">😐 Neutral</button>
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        // ============================================
-        // FACE ANIMATION ENGINE
-        // ============================================
-
-        class RobotFaceRenderer {
+        class ExpressiveEyesRenderer {
             constructor(canvasId) {
                 this.canvas = document.getElementById(canvasId);
                 this.ctx = this.canvas.getContext('2d');
-                this.width = this.canvas.width;
-                this.height = this.canvas.height;
-                
-                // Animation state
-                this.emotion = 'neutral'; // neutral, happy, sad, angry, surprised
-                this.eyeOpen = 1.0; // 0 = closed, 1 = fully open
-                this.mouthOpen = 0.3; // 0 = closed, 1 = fully open
-                this.blinkTimer = 0;
-                this.blinkDuration = 0.1; // seconds
-                this.blinkInterval = 3; // blink every 3 seconds
-                this.animationTime = 0;
-                this.isListening = false;
-                this.isSpeaking = false;
-                
-                // Eye position (for looking around)
-                this.eyeX = 0;
-                this.eyeY = 0;
-                
-                this.startAnimation();
+                this.emotion = 'neutral';
+                this.eyeOpen = 1.0;
+                this.time = 0;
+                this.tears = []; // Array to hold falling tear particles
+                this.animate();
             }
 
-            startAnimation() {
-                const render = () => {
-                    this.update(1/60); // 60 FPS
-                    this.draw();
-                    requestAnimationFrame(render);
-                };
-                render();
-            }
-
-            update(deltaTime) {
-                this.animationTime += deltaTime;
-                
-                // Blinking logic
-                const blinkPhase = this.animationTime % this.blinkInterval;
-                if (blinkPhase < this.blinkDuration) {
-                    this.eyeOpen = 1 - (blinkPhase / this.blinkDuration);
-                } else {
-                    this.eyeOpen = 1.0;
-                }
-                
-                // Update mouth based on speaking
-                if (this.isSpeaking) {
-                    this.mouthOpen = 0.3 + 0.3 * Math.sin(this.animationTime * 4);
-                } else {
-                    this.mouthOpen = 0.1;
-                }
-                
-                // Update eyes position if listening
-                if (this.isListening) {
-                    this.eyeX = 0.1 * Math.sin(this.animationTime * 2);
-                    this.eyeY = 0.05 * Math.cos(this.animationTime * 1.5);
-                } else {
-                    this.eyeX = 0;
-                    this.eyeY = 0;
-                }
+            animate() {
+                this.time += 0.05;
+                // Periodic blinking logic
+                this.eyeOpen = (this.time % 5 < 0.15) ? 0.1 : 1.0;
+                this.draw();
+                requestAnimationFrame(() => this.animate());
             }
 
             draw() {
-                // Clear canvas
-                this.ctx.fillStyle = '#1a1a2e';
-                this.ctx.fillRect(0, 0, this.width, this.height);
-                
-                // Draw background glow
-                this.drawBackgroundGlow();
-                
-                // Draw head
-                this.drawHead();
-                
-                // Draw eyes
-                this.drawEyes();
-                
-                // Draw mouth
-                this.drawMouth();
-                
-                // Draw expression indicators
-                this.drawExpressionIndicators();
-            }
-
-            drawBackgroundGlow() {
-                const gradient = this.ctx.createRadialGradient(
-                    this.width/2, this.height/2, 0,
-                    this.width/2, this.height/2, this.width
-                );
-                
-                const glowColor = this.getEmotionColor();
-                gradient.addColorStop(0, `rgba(${glowColor}, 0.3)`);
-                gradient.addColorStop(1, `rgba(${glowColor}, 0)`);
-                
-                this.ctx.fillStyle = gradient;
-                this.ctx.fillRect(0, 0, this.width, this.height);
-            }
-
-            drawHead() {
-                const centerX = this.width / 2;
-                const centerY = this.height / 2;
-                const headRadius = 150;
-                
-                // Head circle with gradient
-                const headGradient = this.ctx.createRadialGradient(
-                    centerX - 30, centerY - 30, 0,
-                    centerX, centerY, headRadius
-                );
-                
-                const emotionColor = this.getEmotionColor();
-                headGradient.addColorStop(0, `rgb(${emotionColor})`);
-                headGradient.addColorStop(1, `rgb(${Math.max(emotionColor.split(',')[0]-30, 0)}, ${Math.max(emotionColor.split(',')[1]-30, 0)}, ${Math.max(emotionColor.split(',')[2]-30, 0)})`);
-                
-                this.ctx.fillStyle = '#2a2d5a';
-                this.ctx.beginPath();
-                this.ctx.arc(centerX, centerY, headRadius, 0, Math.PI * 2);
-                this.ctx.fill();
-                
-                // Head outline
-                this.ctx.strokeStyle = `rgb(${emotionColor})`;
-                this.ctx.lineWidth = 3;
-                this.ctx.stroke();
-            }
-
-            drawEyes() {
-                const centerX = this.width / 2;
-                const centerY = this.height / 2;
-                
-                const eyeSpacing = 60;
-                const eyeRadius = 35;
-                const pupilRadius = 15;
-                
-                // Left eye
-                this.drawSingleEye(
-                    centerX - eyeSpacing,
-                    centerY - 40,
-                    eyeRadius,
-                    pupilRadius
-                );
-                
-                // Right eye
-                this.drawSingleEye(
-                    centerX + eyeSpacing,
-                    centerY - 40,
-                    eyeRadius,
-                    pupilRadius
-                );
-            }
-
-            drawSingleEye(x, y, eyeRadius, pupilRadius) {
-                // Eye white
-                this.ctx.fillStyle = '#ffffff';
-                this.ctx.beginPath();
-                this.ctx.ellipse(x, y, eyeRadius, eyeRadius * this.eyeOpen, 0, 0, Math.PI * 2);
-                this.ctx.fill();
-                
-                // Eye outline
-                this.ctx.strokeStyle = '#000';
-                this.ctx.lineWidth = 2;
-                this.ctx.stroke();
-                
-                // Pupil
                 this.ctx.fillStyle = '#000';
-                this.ctx.beginPath();
-                const pupilX = x + this.eyeX * 10;
-                const pupilY = y + this.eyeY * 10;
-                this.ctx.arc(pupilX, pupilY, pupilRadius * this.eyeOpen, 0, Math.PI * 2);
-                this.ctx.fill();
+                this.ctx.fillRect(0, 0, 500, 400);
                 
-                // Pupil shine
-                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-                this.ctx.beginPath();
-                this.ctx.arc(pupilX - 5, pupilY - 5, 5, 0, Math.PI * 2);
-                this.ctx.fill();
+                const color = this.getEmotionColor();
+                
+                // If sad, handle tear animations
+                if (this.emotion === 'sad') {
+                    this.drawTears();
+                }
+
+                // Draw left and right eyes
+                this.drawEye(170, 200, color, 'L');
+                this.drawEye(330, 200, color, 'R');
             }
 
-            drawMouth() {
-                const centerX = this.width / 2;
-                const centerY = this.height / 2;
-                
-                this.ctx.strokeStyle = '#ffcccc';
-                this.ctx.lineWidth = 3;
-                this.ctx.beginPath();
-                
-                const mouthY = centerY + 60;
-                const mouthWidth = 40;
-                const mouthHeight = 30 * this.mouthOpen;
-                
-                // Draw mouth based on emotion
+            drawTears() {
+                // Spawn new tears occasionally
+                if (Math.random() > 0.92) {
+                    this.tears.push({x: 170 + (Math.random()*30-15), y: 220, speed: Math.random()*2+2});
+                    this.tears.push({x: 330 + (Math.random()*30-15), y: 220, speed: Math.random()*2+2});
+                }
+
+                this.ctx.fillStyle = 'rgba(74, 144, 226, 0.7)';
+                for (let i = 0; i < this.tears.length; i++) {
+                    let t = this.tears[i];
+                    t.y += t.speed;
+                    this.ctx.beginPath();
+                    this.ctx.arc(t.x, t.y, 4, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    
+                    // Remove tears that fall off screen
+                    if (t.y > 400) {
+                        this.tears.splice(i, 1);
+                        i--;
+                    }
+                }
+            }
+
+            drawEye(x, y, color, side) {
+                this.ctx.save();
+                this.ctx.translate(x, y);
+                this.ctx.fillStyle = color;
+                this.ctx.shadowBlur = 20;
+                this.ctx.shadowColor = color;
+
                 if (this.emotion === 'happy') {
-                    // Smiling mouth
-                    this.ctx.arc(centerX, mouthY, mouthWidth, 0, Math.PI, false);
-                } else if (this.emotion === 'sad') {
-                    // Sad mouth (upside down)
-                    this.ctx.arc(centerX, mouthY - 10, mouthWidth, Math.PI, 0, false);
+                    // Cute curved "n" shape eyes (^)
+                    this.ctx.lineWidth = 15;
+                    this.ctx.strokeStyle = color;
+                    this.ctx.lineCap = 'round';
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 15, 30, Math.PI, 0, false);
+                    this.ctx.stroke();
                 } else if (this.emotion === 'angry') {
-                    // Angry mouth (straight line)
-                    this.ctx.moveTo(centerX - mouthWidth, mouthY);
-                    this.ctx.lineTo(centerX + mouthWidth, mouthY);
+                    // Thick visible slanted eyebrows
+                    this.ctx.strokeStyle = color;
+                    this.ctx.lineWidth = 14;
+                    this.ctx.lineCap = 'round';
+                    this.ctx.beginPath();
+                    if (side === 'L') {
+                        this.ctx.moveTo(-50, -65);
+                        this.ctx.lineTo(25, -35);
+                    } else {
+                        this.ctx.moveTo(50, -65);
+                        this.ctx.lineTo(-25, -35);
+                    }
+                    this.ctx.stroke();
+                    this.drawPill(45, 75);
+                } else if (this.emotion === 'sad') {
+                    // Droopy slanted eyes
+                    this.ctx.rotate(side === 'L' ? -0.25 : 0.25);
+                    this.drawPill(40, 55 * this.eyeOpen);
                 } else {
-                    // Neutral mouth (O shape)
-                    this.ctx.ellipse(centerX, mouthY, mouthWidth / 2, mouthHeight, 0, 0, Math.PI * 2);
+                    // Neutral pill eyes
+                    this.drawPill(48, 75 * this.eyeOpen);
                 }
-                
-                this.ctx.stroke();
+                this.ctx.restore();
             }
 
-            drawExpressionIndicators() {
-                const centerX = this.width / 2;
-                const centerY = this.height / 2;
-                
-                if (this.emotion === 'angry') {
-                    // Draw angry eyebrows
-                    this.ctx.strokeStyle = '#ff6b6b';
-                    this.ctx.lineWidth = 4;
-                    this.ctx.lineCap = 'round';
-                    
-                    // Left eyebrow
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(centerX - 70, centerY - 80);
-                    this.ctx.lineTo(centerX - 30, centerY - 95);
-                    this.ctx.stroke();
-                    
-                    // Right eyebrow
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(centerX + 30, centerY - 95);
-                    this.ctx.lineTo(centerX + 70, centerY - 80);
-                    this.ctx.stroke();
-                } else if (this.emotion === 'sad') {
-                    // Draw sad eyebrows
-                    this.ctx.strokeStyle = '#4a90e2';
-                    this.ctx.lineWidth = 4;
-                    this.ctx.lineCap = 'round';
-                    
-                    // Left eyebrow
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(centerX - 70, centerY - 95);
-                    this.ctx.lineTo(centerX - 30, centerY - 80);
-                    this.ctx.stroke();
-                    
-                    // Right eyebrow
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(centerX + 30, centerY - 80);
-                    this.ctx.lineTo(centerX + 70, centerY - 95);
-                    this.ctx.stroke();
-                } else if (this.emotion === 'happy') {
-                    // Draw happy squint eyes
-                    this.ctx.strokeStyle = '#ffd700';
-                    this.ctx.lineWidth = 2;
-                    
-                    // Left squint
-                    this.ctx.beginPath();
-                    this.ctx.arc(this.width / 2 - 60, this.height / 2 - 40, 20, 0, Math.PI, false);
-                    this.ctx.stroke();
-                    
-                    // Right squint
-                    this.ctx.beginPath();
-                    this.ctx.arc(this.width / 2 + 60, this.height / 2 - 40, 20, 0, Math.PI, false);
-                    this.ctx.stroke();
-                }
+            drawPill(w, h) {
+                this.ctx.beginPath();
+                this.ctx.roundRect(-w/2, -h/2, w, h, 20);
+                this.ctx.fill();
             }
 
             getEmotionColor() {
                 const colors = {
-                    'happy': '255, 215, 0',      // Gold
-                    'sad': '74, 144, 226',       // Blue
-                    'angry': '255, 107, 107',    // Red
-                    'surprised': '230, 126, 34', // Orange
-                    'neutral': '100, 200, 255'   // Cyan
+                    'happy': '#FFD700', // Gold
+                    'sad': '#4A90E2',   // Blue
+                    'angry': '#FF5050',  // Red
+                    'neutral': '#4ADE80' // Mint Green
                 };
                 return colors[this.emotion] || colors['neutral'];
             }
-
-            setEmotion(emotion) {
-                this.emotion = emotion;
-            }
-
-            setListening(isListening) {
-                this.isListening = isListening;
-            }
-
-            setSpeaking(isSpeaking) {
-                this.isSpeaking = isSpeaking;
-            }
         }
 
-        // Initialize face renderer
-        const faceRenderer = new RobotFaceRenderer('faceCanvas');
+        const eyes = new ExpressiveEyesRenderer('faceCanvas');
 
-        // ============================================
         // WebSocket Communication
-        // ============================================
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}/ws/control`);
 
-        const SERVER_URL = 'ws://localhost:8000/ws/control';
-        let ws = null;
-        let isListening = false;
-
-        function connectWebSocket() {
-            ws = new WebSocket(SERVER_URL);
-            
-            ws.onopen = () => {
-                console.log('Connected to server');
-                document.getElementById('listenIndicator').classList.add('active');
-            };
-            
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                handleServerMessage(data);
-            };
-            
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-            };
-            
-            ws.onclose = () => {
-                console.log('Disconnected from server');
-                document.getElementById('listenIndicator').classList.remove('active');
-                // Attempt to reconnect after 3 seconds
-                setTimeout(connectWebSocket, 3000);
-            };
-        }
-
-        function handleServerMessage(data) {
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
             if (data.type === 'state') {
                 const state = data.data;
-                faceRenderer.setEmotion(state.emotion);
-                faceRenderer.setListening(state.is_listening);
-                faceRenderer.setSpeaking(state.is_speaking);
-                
-                document.getElementById('emotionDisplay').textContent = state.emotion;
+                eyes.emotion = state.emotion;
+                document.getElementById('userEmotion').textContent = state.user_emotion;
+                document.getElementById('robotEmotion').textContent = state.emotion;
                 document.getElementById('batteryLevel').textContent = state.battery_level;
-                
-                if (state.is_speaking) {
-                    document.getElementById('speakIndicator').classList.add('active');
-                } else {
-                    document.getElementById('speakIndicator').classList.remove('active');
-                }
-            } else if (data.type === 'response') {
-                console.log('Response:', data);
-                // Play audio if available
-                if (data.audio) {
-                    playAudio(data.audio);
-                }
             }
+        };
+
+        function changeEmotion(emo) {
+            eyes.emotion = emo;
+            ws.send(JSON.stringify({ type: 'emotion', emotion: emo }));
         }
 
-        function sendCommand(command) {
-            if (!ws || ws.readyState !== WebSocket.OPEN) {
-                console.error('WebSocket not connected');
-                return;
-            }
-
-            let message = {};
-            
-            if (command.startsWith('move_') || ['forward', 'backward', 'left', 'right', 'stop'].includes(command)) {
-                message = {
-                    type: 'move',
-                    direction: command,
-                    speed: 200
-                };
-            } else if (command.startsWith('emotion_')) {
-                message = {
-                    type: 'emotion',
-                    emotion: command.replace('emotion_', '')
-                };
-            }
-            
-            if (Object.keys(message).length > 0) {
-                ws.send(JSON.stringify(message));
-            }
+        function sendText(txt) {
+            ws.send(JSON.stringify({ type: 'text', text: txt }));
         }
 
-        function changeEmotion(emotion) {
-            faceRenderer.setEmotion(emotion);
-            sendCommand(`emotion_${emotion}`);
+        function sendCommand(dir) {
+            ws.send(JSON.stringify({ type: 'move', direction: dir, speed: 200 }));
         }
-
-        function toggleListening() {
-            isListening = !isListening;
-            faceRenderer.setListening(isListening);
-            
-            if (isListening) {
-                startAudioCapture();
-            } else {
-                stopAudioCapture();
-            }
-        }
-
-        function startAudioCapture() {
-            console.log('Starting audio capture...');
-            // TODO: Implement audio capture and Gemini Live API integration
-        }
-
-        function stopAudioCapture() {
-            console.log('Stopping audio capture...');
-        }
-
-        function playAudio(audioData) {
-            console.log('Playing audio...');
-            // TODO: Implement audio playback
-        }
-
-        // Initialize
-        connectWebSocket();
-
-        // Control buttons
-        document.addEventListener('DOMContentLoaded', () => {
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'ArrowUp') sendCommand('forward');
-                if (e.key === 'ArrowDown') sendCommand('backward');
-                if (e.key === 'ArrowLeft') sendCommand('left');
-                if (e.key === 'ArrowRight') sendCommand('right');
-                if (e.key === ' ') { e.preventDefault(); toggleListening(); }
-            });
-        });
     </script>
 </body>
 </html>
