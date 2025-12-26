@@ -1,5 +1,7 @@
 class AppConfig {
   // Server Configuration
+  static const String baseUrl = "http://10.44.35.29:8000"; // Your Laptop IP
+  static const String wsUrl = "ws://10.44.35.29:8000/ws/control"; // WebSocket URL
   static const String defaultServerUrl = '192.168.1.100';
   static const int defaultServerPort = 8000;
   static const String websocketPath = '/ws/control';
