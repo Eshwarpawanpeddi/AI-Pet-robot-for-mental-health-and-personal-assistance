@@ -17,7 +17,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Server Configuration
-SERVER_URL = "ws://192.168.1.100:8000/ws/raspberry_pi"
+SERVER_URL = "ws://10.44.35.29:8000/ws/raspberry_pi"
 RECONNECT_DELAY = 5
 
 # Motor Driver GPIO Pin Definitions (1 x L298N Driver - Parallel Wiring)

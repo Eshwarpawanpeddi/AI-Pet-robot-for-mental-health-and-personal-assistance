@@ -2,25 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Pet Robot Face - Expressive Cute Eyes</title>
+    <title>Pet Robot Face - Fullscreen Edition</title>
     <link rel="stylesheet" href="/static/styles.css">
-    <style>
-        .face-canvas { 
-            background: #000; 
-            border: 8px solid #222; 
-            border-radius: 60px; 
-            box-shadow: 0 0 40px rgba(0,0,0,0.8);
-        }
-        .robot-container { 
-            background: rgba(0,0,0,0.3); 
-            padding: 30px; 
-            border-radius: 50px;
-        }
-    </style>
 </head>
 <body>
     <div class="robot-container">
-        <canvas id="faceCanvas" class="face-canvas" width="500" height="400"></canvas>
+        <canvas id="faceCanvas" class="face-canvas"></canvas>
         
         <div class="status-bar">
             <div class="status-item">User Feel: <span id="userEmotion" style="color:#4ade80">Neutral</span></div>
@@ -45,13 +32,25 @@
                 this.emotion = 'neutral';
                 this.eyeOpen = 1.0;
                 this.time = 0;
-                this.tears = []; // Array to hold falling tear particles
+                this.tears = [];
+                
+                // Initialize sizing
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                
                 this.animate();
+            }
+
+            resize() {
+                // Adjusts the internal drawing resolution to match the screen
+                this.canvas.width = this.canvas.clientWidth;
+                this.canvas.height = this.canvas.clientHeight;
+                this.centerX = this.canvas.width / 2;
+                this.centerY = this.canvas.height / 2;
             }
 
             animate() {
                 this.time += 0.05;
-                // Periodic blinking logic
                 this.eyeOpen = (this.time % 5 < 0.15) ? 0.1 : 1.0;
                 this.draw();
                 requestAnimationFrame(() => this.animate());
@@ -59,25 +58,25 @@
 
             draw() {
                 this.ctx.fillStyle = '#000';
-                this.ctx.fillRect(0, 0, 500, 400);
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
                 
                 const color = this.getEmotionColor();
                 
-                // If sad, handle tear animations
                 if (this.emotion === 'sad') {
                     this.drawTears();
                 }
 
-                // Draw left and right eyes
-                this.drawEye(170, 200, color, 'L');
-                this.drawEye(330, 200, color, 'R');
+                // Spacing between eyes scales with screen width
+                const eyeSpacing = this.canvas.width * 0.16;
+                this.drawEye(this.centerX - eyeSpacing, this.centerY, color, 'L');
+                this.drawEye(this.centerX + eyeSpacing, this.centerY, color, 'R');
             }
 
             drawTears() {
-                // Spawn new tears occasionally
+                const eyeSpacing = this.canvas.width * 0.16;
                 if (Math.random() > 0.92) {
-                    this.tears.push({x: 170 + (Math.random()*30-15), y: 220, speed: Math.random()*2+2});
-                    this.tears.push({x: 330 + (Math.random()*30-15), y: 220, speed: Math.random()*2+2});
+                    this.tears.push({x: (this.centerX - eyeSpacing) + (Math.random()*30-15), y: this.centerY + 20, speed: Math.random()*2+2});
+                    this.tears.push({x: (this.centerX + eyeSpacing) + (Math.random()*30-15), y: this.centerY + 20, speed: Math.random()*2+2});
                 }
 
                 this.ctx.fillStyle = 'rgba(74, 144, 226, 0.7)';
@@ -88,8 +87,7 @@
                     this.ctx.arc(t.x, t.y, 4, 0, Math.PI * 2);
                     this.ctx.fill();
                     
-                    // Remove tears that fall off screen
-                    if (t.y > 400) {
+                    if (t.y > this.canvas.height) {
                         this.tears.splice(i, 1);
                         i--;
                     }
@@ -103,52 +101,48 @@
                 this.ctx.shadowBlur = 20;
                 this.ctx.shadowColor = color;
 
+                // Scale the eye size based on screen height
+                const baseSize = this.canvas.height * 0.12;
+
                 if (this.emotion === 'happy') {
-                    // Cute curved "n" shape eyes (^)
-                    this.ctx.lineWidth = 15;
+                    this.ctx.lineWidth = baseSize * 0.25;
                     this.ctx.strokeStyle = color;
                     this.ctx.lineCap = 'round';
                     this.ctx.beginPath();
-                    this.ctx.arc(0, 15, 30, Math.PI, 0, false);
+                    this.ctx.arc(0, baseSize * 0.2, baseSize * 0.6, Math.PI, 0, false);
                     this.ctx.stroke();
                 } else if (this.emotion === 'angry') {
-                    // Thick visible slanted eyebrows
                     this.ctx.strokeStyle = color;
-                    this.ctx.lineWidth = 14;
+                    this.ctx.lineWidth = baseSize * 0.2;
                     this.ctx.lineCap = 'round';
                     this.ctx.beginPath();
                     if (side === 'L') {
-                        this.ctx.moveTo(-50, -65);
-                        this.ctx.lineTo(25, -35);
+                        this.ctx.moveTo(-baseSize, -baseSize);
+                        this.ctx.lineTo(baseSize * 0.5, -baseSize * 0.4);
                     } else {
-                        this.ctx.moveTo(50, -65);
-                        this.ctx.lineTo(-25, -35);
+                        this.ctx.moveTo(baseSize, -baseSize);
+                        this.ctx.lineTo(-baseSize * 0.5, -baseSize * 0.4);
                     }
                     this.ctx.stroke();
-                    this.drawPill(45, 75);
+                    this.drawPill(baseSize * 0.9, baseSize * 1.5);
                 } else if (this.emotion === 'sad') {
-                    // Droopy slanted eyes
                     this.ctx.rotate(side === 'L' ? -0.25 : 0.25);
-                    this.drawPill(40, 55 * this.eyeOpen);
+                    this.drawPill(baseSize * 0.8, baseSize * 1.1 * this.eyeOpen);
                 } else {
-                    // Neutral pill eyes
-                    this.drawPill(48, 75 * this.eyeOpen);
+                    this.drawPill(baseSize * 0.9, baseSize * 1.5 * this.eyeOpen);
                 }
                 this.ctx.restore();
             }
 
             drawPill(w, h) {
                 this.ctx.beginPath();
-                this.ctx.roundRect(-w/2, -h/2, w, h, 20);
+                this.ctx.roundRect(-w/2, -h/2, w, h, w/2);
                 this.ctx.fill();
             }
 
             getEmotionColor() {
                 const colors = {
-                    'happy': '#FFD700', // Gold
-                    'sad': '#4A90E2',   // Blue
-                    'angry': '#FF5050',  // Red
-                    'neutral': '#4ADE80' // Mint Green
+                    'happy': '#FFD700', 'sad': '#4A90E2', 'angry': '#FF5050', 'neutral': '#4ADE80'
                 };
                 return colors[this.emotion] || colors['neutral'];
             }
@@ -156,7 +150,6 @@
 
         const eyes = new ExpressiveEyesRenderer('faceCanvas');
 
-        // WebSocket Communication
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const ws = new WebSocket(`${protocol}//${window.location.host}/ws/control`);
 
@@ -178,10 +171,6 @@
 
         function sendText(txt) {
             ws.send(JSON.stringify({ type: 'text', text: txt }));
-        }
-
-        function sendCommand(dir) {
-            ws.send(JSON.stringify({ type: 'move', direction: dir, speed: 200 }));
         }
     </script>
 </body>
