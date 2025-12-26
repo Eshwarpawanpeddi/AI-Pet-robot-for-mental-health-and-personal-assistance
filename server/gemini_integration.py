@@ -11,7 +11,7 @@ class GeminiMultimodalIntegration:
     def __init__(self, api_key: str):
         genai.configure(api_key=api_key)
         self.session = None
-        self.model_name = "gemini-2.0-flash-exp"
+        self.model_name = "gemini-1.5-flash"
         self.multimodal_model = None
         
     async def initialize_session(self):
