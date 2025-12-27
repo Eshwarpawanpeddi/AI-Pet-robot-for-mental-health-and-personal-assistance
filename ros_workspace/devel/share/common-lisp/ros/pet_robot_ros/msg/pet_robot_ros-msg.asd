@@ -1,0 +1,31 @@
+
+(cl:in-package :asdf)
+
+(defsystem "pet_robot_ros-msg"
+  :depends-on (:roslisp-msg-protocol :roslisp-utils :actionlib_msgs-msg
+               :std_msgs-msg
+)
+  :components ((:file "_package")
+    (:file "BreathingExerciseAction" :depends-on ("_package_BreathingExerciseAction"))
+    (:file "_package_BreathingExerciseAction" :depends-on ("_package"))
+    (:file "BreathingExerciseActionFeedback" :depends-on ("_package_BreathingExerciseActionFeedback"))
+    (:file "_package_BreathingExerciseActionFeedback" :depends-on ("_package"))
+    (:file "BreathingExerciseActionGoal" :depends-on ("_package_BreathingExerciseActionGoal"))
+    (:file "_package_BreathingExerciseActionGoal" :depends-on ("_package"))
+    (:file "BreathingExerciseActionResult" :depends-on ("_package_BreathingExerciseActionResult"))
+    (:file "_package_BreathingExerciseActionResult" :depends-on ("_package"))
+    (:file "BreathingExerciseFeedback" :depends-on ("_package_BreathingExerciseFeedback"))
+    (:file "_package_BreathingExerciseFeedback" :depends-on ("_package"))
+    (:file "BreathingExerciseGoal" :depends-on ("_package_BreathingExerciseGoal"))
+    (:file "_package_BreathingExerciseGoal" :depends-on ("_package"))
+    (:file "BreathingExerciseResult" :depends-on ("_package_BreathingExerciseResult"))
+    (:file "_package_BreathingExerciseResult" :depends-on ("_package"))
+    (:file "Emotion" :depends-on ("_package_Emotion"))
+    (:file "_package_Emotion" :depends-on ("_package"))
+    (:file "MoodLog" :depends-on ("_package_MoodLog"))
+    (:file "_package_MoodLog" :depends-on ("_package"))
+    (:file "RobotState" :depends-on ("_package_RobotState"))
+    (:file "_package_RobotState" :depends-on ("_package"))
+    (:file "SensorData" :depends-on ("_package_SensorData"))
+    (:file "_package_SensorData" :depends-on ("_package"))
+  ))

@@ -60,11 +60,12 @@ include_directories(
 )
 
 ## Install Python scripts
+## Install Python scripts
 catkin_install_python(PROGRAMS
   nodes/robot_controller_node.py
   nodes/mental_health_node.py
   nodes/emotion_node.py
-  nodes/motor_control_node.py
+  # REMOVED nodes/motor_control_node.py because it is missing from the folder
   scripts/test_robot.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
