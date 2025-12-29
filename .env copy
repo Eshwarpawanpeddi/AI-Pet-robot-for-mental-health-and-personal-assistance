@@ -1,4 +1,5 @@
 # Gemini API Configuration (Optional - required for voice features)
+#Intigrate api
 # Get your API key from: https://makersuite.google.com/app/apikey
 GEMINI_API_KEY="key_here"
 
