@@ -150,12 +150,25 @@ async def handle_text_command(data: Dict):
     await broadcast_state()
     
     if robot_state.gemini_session:
+        robot_state.is_speaking = True
+        await broadcast_state()
+        
         response = await robot_state.gemini_session.send_text(text)
         if response:
+            response_text = response['text']
             # Robot reacts with its own detected emotion
-            robot_state.emotion = detect_emotion(response['text'])
-            robot_state.last_transcript = f"User: {text}\nRobot: {response['text']}"
+            robot_state.emotion = detect_emotion(response_text)
+            robot_state.last_transcript = f"User: {text}\nRobot: {response_text}"
             await sync_emotion_to_display(robot_state.emotion)
+            
+            # Send speech to Raspberry Pi if enabled
+            if robot_state.raspberry_pi_client:
+                await robot_state.raspberry_pi_client.send_json({
+                    "type": "speak",
+                    "text": response_text
+                })
+        
+        robot_state.is_speaking = False
     
     robot_state.is_listening = False
     await broadcast_state()
@@ -192,6 +205,41 @@ async def broadcast_state():
 @app.get("/")
 async def root():
     return FileResponse(os.path.join(frontend_dir, "face_display.html"))
+
+@app.get("/api/state")
+async def get_state():
+    """Get current robot state"""
+    return {
+        'emotion': robot_state.emotion,
+        'user_emotion': robot_state.user_emotion,
+        'battery_level': robot_state.battery_level,
+        'is_listening': robot_state.is_listening,
+        'is_speaking': robot_state.is_speaking,
+        'last_transcript': robot_state.last_transcript,
+        'camera_enabled': robot_state.camera_enabled,
+        'control_mode': robot_state.control_mode,
+        'raspberry_pi_connected': robot_state.raspberry_pi_client is not None
+    }
+
+@app.post("/api/control_mode")
+async def set_control_mode(data: Dict):
+    """Set control mode (manual or autonomous)"""
+    mode = data.get('mode', 'manual')
+    robot_state.control_mode = mode
+    await broadcast_state()
+    return {"status": "ok", "mode": mode}
+
+@app.post("/api/speak")
+async def speak_command(data: Dict):
+    """Send text to be spoken by robot"""
+    text = data.get('text', '')
+    if text and robot_state.raspberry_pi_client:
+        await robot_state.raspberry_pi_client.send_json({
+            "type": "speak",
+            "text": text
+        })
+        return {"status": "ok", "text": text}
+    return {"status": "error", "message": "No text or Pi not connected"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

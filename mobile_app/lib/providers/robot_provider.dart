@@ -37,6 +37,8 @@ class RobotProvider with ChangeNotifier {
   String get controlMode => _controlMode;
   bool get espConnected => _espConnected;
   bool get raspberryPiConnected => _raspberryPiConnected;
+  bool get cameraEnabled => _robotState.cameraEnabled ?? false;
+  String? get cameraFrame => _robotState.cameraFrame;
 
   RobotProvider() {
     _init();
@@ -213,6 +215,31 @@ class RobotProvider with ChangeNotifier {
       _errorMessage = 'Failed to get crisis resources: $e';
       notifyListeners();
       return null;
+    }
+  }
+
+  // Camera Methods
+  void toggleCamera() {
+    if (_robotState.cameraEnabled ?? false) {
+      _wsService.sendCameraCommand('stop');
+    } else {
+      _wsService.sendCameraCommand('start');
+    }
+  }
+  
+  // Speech Methods
+  Future<void> speak(String text) async {
+    if (_apiService == null) {
+      _errorMessage = 'Not connected to server';
+      notifyListeners();
+      return;
+    }
+
+    try {
+      await _apiService!.speak(text);
+    } catch (e) {
+      _errorMessage = 'Failed to speak: $e';
+      notifyListeners();
     }
   }
 

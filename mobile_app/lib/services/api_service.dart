@@ -110,7 +110,7 @@ class ApiService {
   Future<Map<String, dynamic>> setControlMode(String mode) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/mode'),
+        Uri.parse('$baseUrl/control_mode'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'mode': mode}),
       );
@@ -129,18 +129,31 @@ class ApiService {
   Future<String> getControlMode() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/mode'),
+        Uri.parse('$baseUrl/state'),
         headers: {'Content-Type': 'application/json'},
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['mode'] ?? 'manual';
+        return data['control_mode'] ?? 'manual';
       } else {
         throw Exception('Failed to get control mode');
       }
     } catch (e) {
       print('Error getting control mode: $e');
+      rethrow;
+    }
+  }
+  
+  Future<void> speak(String text) async {
+    try {
+      await http.post(
+        Uri.parse('$baseUrl/speak'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'text': text}),
+      );
+    } catch (e) {
+      print('Error sending speak command: $e');
       rethrow;
     }
   }

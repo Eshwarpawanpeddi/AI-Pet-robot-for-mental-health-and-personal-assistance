@@ -242,6 +242,8 @@ class RaspberryPiController:
                 asyncio.create_task(self.start_camera_stream())
             elif msg_type == "stop_camera":
                 await self.stop_camera_stream()
+            elif msg_type == "speak":
+                await self.speak_text(data.get("text", ""))
                 
         except json.JSONDecodeError as e:
             logger.error(f"JSON decode error: {e}")
@@ -308,7 +310,31 @@ class RaspberryPiController:
         logger.info(f"Emotion updated to: {emotion}")
 
     async def play_audio(self, audio_data: Dict):
-        logger.info(f"Playing audio: {audio_data}")
+        """Play audio (text-to-speech) on Raspberry Pi"""
+        try:
+            text = audio_data.get('text', '')
+            if not text:
+                return
+            
+            logger.info(f"Playing audio: {text}")
+            
+            # Use pyttsx3 for offline TTS or espeak for simpler option
+            import subprocess
+            # Using espeak for simple TTS (should be installed on Pi)
+            subprocess.run(['espeak', text], check=False)
+            
+        except Exception as e:
+            logger.error(f"Error playing audio: {e}")
+    
+    async def speak_text(self, text: str):
+        """Text-to-speech on Raspberry Pi"""
+        try:
+            import subprocess
+            logger.info(f"Speaking: {text}")
+            # Using espeak for offline TTS on Raspberry Pi
+            subprocess.Popen(['espeak', '-v', 'en+f3', '-s', '150', text])
+        except Exception as e:
+            logger.error(f"Error in text-to-speech: {e}")
 
     async def send_status(self):
         if self.websocket:
