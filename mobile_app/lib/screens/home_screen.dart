@@ -4,6 +4,7 @@ import '../providers/robot_provider.dart';
 import '../widgets/robot_face.dart';
 import '../widgets/control_pad.dart';
 import '../widgets/emotion_card.dart';
+import '../widgets/camera_view.dart';
 import 'mood_screen.dart';
 import 'settings_screen.dart';
 import '../config/app_config.dart';
@@ -84,6 +85,18 @@ class HomeScreen extends StatelessWidget {
                   // Robot Face
                   const SizedBox(height: 20),
                   RobotFaceWidget(emotion: provider.robotState.emotion),
+                  
+                  const SizedBox(height: 20),
+                  
+                  // Camera View
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: CameraView(
+                      cameraFrame: provider.cameraFrame,
+                      isEnabled: provider.cameraEnabled,
+                      onToggle: () => provider.toggleCamera(),
+                    ),
+                  ),
                   
                   const SizedBox(height: 20),
                   

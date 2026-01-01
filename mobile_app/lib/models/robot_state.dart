@@ -9,6 +9,8 @@ class RobotState {
   final bool? espConnected;
   final bool? raspberryPiConnected;
   final String? lastTranscript;
+  final bool? cameraEnabled;
+  final String? cameraFrame;
 
   RobotState({
     required this.emotion,
@@ -21,6 +23,8 @@ class RobotState {
     this.espConnected,
     this.raspberryPiConnected,
     this.lastTranscript,
+    this.cameraEnabled,
+    this.cameraFrame,
   }) : timestamp = timestamp ?? DateTime.now();
 
   factory RobotState.fromJson(Map<String, dynamic> json) {
@@ -36,6 +40,8 @@ class RobotState {
       espConnected: json['esp_connected'],
       raspberryPiConnected: json['raspberry_pi_connected'],
       lastTranscript: json['last_transcript'],
+      cameraEnabled: json['camera_enabled'],
+      cameraFrame: json['camera_frame'],
     );
   }
 
@@ -50,6 +56,8 @@ class RobotState {
       'esp_connected': espConnected,
       'raspberry_pi_connected': raspberryPiConnected,
       'last_transcript': lastTranscript,
+      'camera_enabled': cameraEnabled,
+      'camera_frame': cameraFrame,
     };
   }
 
@@ -63,6 +71,8 @@ class RobotState {
     bool? espConnected,
     bool? raspberryPiConnected,
     String? lastTranscript,
+    bool? cameraEnabled,
+    String? cameraFrame,
   }) {
     return RobotState(
       emotion: emotion ?? this.emotion,
@@ -74,6 +84,8 @@ class RobotState {
       espConnected: espConnected ?? this.espConnected,
       raspberryPiConnected: raspberryPiConnected ?? this.raspberryPiConnected,
       lastTranscript: lastTranscript ?? this.lastTranscript,
+      cameraEnabled: cameraEnabled ?? this.cameraEnabled,
+      cameraFrame: cameraFrame ?? this.cameraFrame,
     );
   }
 }

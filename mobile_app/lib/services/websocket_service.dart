@@ -208,6 +208,24 @@ class WebSocketService {
 
     _channel!.sink.add(jsonEncode(command));
   }
+  
+  void sendCameraCommand(String action) {
+    if (!_isConnected || _channel == null) return;
+
+    final command = {
+      'type': action == 'start' ? 'start_camera' : 'stop_camera',
+    };
+
+    _channel!.sink.add(jsonEncode(command));
+    
+    // Subscribe to camera frames if starting
+    if (action == 'start') {
+      final subscribe = {
+        'type': 'subscribe_camera',
+      };
+      _channel!.sink.add(jsonEncode(subscribe));
+    }
+  }
 
   void requestState() {
     if (!_isConnected || _channel == null) return;

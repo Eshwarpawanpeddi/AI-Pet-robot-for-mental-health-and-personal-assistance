@@ -2,3 +2,6 @@ smbus-cffi==0.5.1
 RPi.GPIO==0.7.1
 PyYAML==6.0.1
 aiosmbus==0.1.1
+websockets
+picamera2
+pillow
