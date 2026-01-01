@@ -75,7 +75,7 @@ class RobotLauncher:
         """Start ROS bridge if ROS is available"""
         print("🔗 Checking for ROS...")
         try:
-            subprocess.run(["rosversion", "-d"], capture_output=True, check=True, timeout=2)
+            subprocess.run(["rosversion", "-d"], capture_output=True, check=True, timeout=1)
             print("   ROS detected! Starting ROS bridge...")
             
             ros_dir = self.base_dir / "ros_workspace" / "src" / "pet_robot_ros"
@@ -161,12 +161,12 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python launch_all.py                 # Start server only
+  python launch_all.py                 # Start server only (default)
   python launch_all.py --full          # Start all components (if available)
   python launch_all.py --with-pi       # Start server + Pi simulation
   
 For production:
-  - Run this script on your main computer
+  - Run server.py on your main computer
   - Run raspberry_pi_controller.py on the Raspberry Pi
   - Run roslaunch pet_robot_ros ros_bridge.launch if using ROS
         """

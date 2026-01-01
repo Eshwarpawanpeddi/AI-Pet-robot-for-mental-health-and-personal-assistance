@@ -1,0 +1,70 @@
+============================================================
+AI Pet Robot Server Starting...
+============================================================
+
+🚀 Server Configuration:
+   - Host: 0.0.0.0
+   - Port: 8000
+   - Gemini API: ✓ Configured
+
+📡 WebSocket Endpoints:
+   - /ws/control     → Web/Mobile clients
+   - /ws/raspberry_pi → Raspberry Pi hardware
+   - /ws/ros         → ROS bridge (autonomous mode)
+
+🌐 Web Interface:
+   - Main UI: http://localhost:8000
+   - Features: Camera, Speech, Emotions, Controls
+
+📹 Camera Streaming:
+   - Requires Raspberry Pi connection
+   - Toggle in web interface or mobile app
+   - Real-time JPEG streaming at ~10 FPS
+
+🔊 Audio/Speech:
+   - Text-to-Speech on Raspberry Pi (espeak)
+   - Automatic speech when AI responds
+   - Toggle controls in web interface
+
+🤖 ROS Integration:
+   - Launch ROS bridge separately:
+     roslaunch pet_robot_ros ros_bridge.launch
+   - Switch modes in web interface:
+     • Manual → Direct Pi control
+     • Autonomous → ROS navigation
+
+🧠 Mental Health Monitoring:
+   - Real-time emotion tracking
+   - Crisis detection enabled
+   - API: GET /api/mental_health/insights
+
+📱 Mobile App:
+   - Configure server IP in app settings
+   - All features available remotely
+
+⚙️  To Enable All Features:
+   1. Start this server (you're doing it now!)
+   2. On Raspberry Pi:
+      cd hardware/raspberry_pi
+      python3 raspberry_pi_controller.py
+   3. For autonomous mode (optional):
+      roslaunch pet_robot_ros ros_bridge.launch
+
+============================================================
+Server is ready! Open http://localhost:8000 in your browser
+============================================================
+
+INFO: Started server process
+INFO: Waiting for application startup.
+INFO: Application startup complete.
+INFO: Uvicorn running on http://0.0.0.0:8000
+
+... (after 10 seconds) ...
+
+📊 Connection Status:
+   - Web Clients: 1
+   - Raspberry Pi: ✓ Connected
+   - ROS Bridge: ✗ Not connected
+   - Camera: ✓ Active
+   - Control Mode: MANUAL
+   - Mental Health: Concern Level 2/10

@@ -53,8 +53,33 @@ async def initialize_gemini():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Initialize Gemini
     await initialize_gemini()
+    
+    # Start background status logging
+    async def log_status():
+        await asyncio.sleep(10)  # Wait for initial connections
+        while True:
+            logger.info("📊 Connection Status:")
+            logger.info(f"   - Web Clients: {len(robot_state.connected_clients)}")
+            logger.info(f"   - Raspberry Pi: {'✓ Connected' if robot_state.raspberry_pi_client else '✗ Not connected'}")
+            logger.info(f"   - ROS Bridge: {'✓ Connected' if robot_state.ros_client else '✗ Not connected'}")
+            logger.info(f"   - Camera: {'✓ Active' if robot_state.camera_enabled else '○ Inactive'}")
+            logger.info(f"   - Control Mode: {robot_state.control_mode.upper()}")
+            logger.info(f"   - Mental Health: Concern Level {robot_state.concern_level}/10")
+            logger.info("")
+            await asyncio.sleep(30)  # Log status every 30 seconds
+    
+    status_task = asyncio.create_task(log_status())
+    
     yield
+    
+    # Cleanup
+    status_task.cancel()
+    try:
+        await status_task
+    except asyncio.CancelledError:
+        pass
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -497,33 +522,5 @@ if __name__ == "__main__":
     logger.info("Server is ready! Open http://localhost:8000 in your browser")
     logger.info("=" * 60)
     logger.info("")
-    
-    # Add a background task to periodically log connection status
-    async def log_status():
-        await asyncio.sleep(10)  # Wait for initial connections
-        while True:
-            logger.info("📊 Connection Status:")
-            logger.info(f"   - Web Clients: {len(robot_state.connected_clients)}")
-            logger.info(f"   - Raspberry Pi: {'✓ Connected' if robot_state.raspberry_pi_client else '✗ Not connected'}")
-            logger.info(f"   - ROS Bridge: {'✓ Connected' if robot_state.ros_client else '✗ Not connected'}")
-            logger.info(f"   - Camera: {'✓ Active' if robot_state.camera_enabled else '○ Inactive'}")
-            logger.info(f"   - Control Mode: {robot_state.control_mode.upper()}")
-            logger.info(f"   - Mental Health: Concern Level {robot_state.concern_level}/10")
-            logger.info("")
-            await asyncio.sleep(30)  # Log status every 30 seconds
-    
-    # Start status logging in background
-    @asynccontextmanager
-    async def lifespan_with_status(app: FastAPI):
-        # Initialize Gemini
-        await initialize_gemini()
-        # Start status logging
-        status_task = asyncio.create_task(log_status())
-        yield
-        # Cleanup
-        status_task.cancel()
-    
-    # Update app lifespan
-    app.router.lifespan_context = lifespan_with_status
     
     uvicorn.run(app, host="0.0.0.0", port=8000)
