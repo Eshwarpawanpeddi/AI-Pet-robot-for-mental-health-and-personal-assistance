@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- ROS-Server Bridge Launch File -->
+  <!-- Connects ROS with the FastAPI server for autonomous control -->
+  
+  <arg name="server_url" default="ws://localhost:8000/ws/ros" />
+  
+  <!-- Start ROS-Server Bridge -->
+  <node pkg="pet_robot_ros" type="ros_server_bridge.py" name="ros_server_bridge" output="screen">
+    <param name="server_url" value="$(arg server_url)" />
+  </node>
+  
+  <!-- Optional: Start robot controller if not already running -->
+  <include file="$(find pet_robot_ros)/launch/pet_robot.launch" />
+  
+</launch>
