@@ -23,6 +23,7 @@ class ROSServerBridge:
         self.websocket = None
         self.running = False
         self.autonomous_mode = False
+        self.event_loop = None
         
         # ROS Publishers
         self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
@@ -36,11 +37,15 @@ class ROSServerBridge:
     
     def state_callback(self, msg):
         """Forward robot state to server"""
-        if self.websocket and self.running:
-            asyncio.run(self.send_to_server({
-                'type': 'ros_state',
-                'data': msg.data
-            }))
+        if self.websocket and self.running and self.event_loop:
+            # Schedule coroutine in the event loop
+            asyncio.run_coroutine_threadsafe(
+                self.send_to_server({
+                    'type': 'ros_state',
+                    'data': msg.data
+                }),
+                self.event_loop
+            )
     
     def scan_callback(self, msg):
         """Process laser scan for obstacle avoidance"""
@@ -106,6 +111,7 @@ class ROSServerBridge:
     
     async def connect_to_server(self):
         """Connect to FastAPI server via WebSocket"""
+        self.event_loop = asyncio.get_event_loop()
         while self.running:
             try:
                 async with websockets.connect(self.server_url) as websocket:

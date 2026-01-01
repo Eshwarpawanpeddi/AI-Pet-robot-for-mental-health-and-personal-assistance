@@ -2,6 +2,18 @@
 
 An empathetic AI-powered companion robot designed specifically for **mental health support** and **personal assistance**. This robot uses advanced AI, emotional intelligence, and compassionate interaction to provide daily support, companionship, and wellness assistance for individuals managing their mental health.
 
+## 🎉 Latest Updates (January 2026)
+
+### New Features Added:
+- 🎥 **Live Camera Streaming**: Real-time video feed from Raspberry Pi to web and mobile interfaces
+- 🔊 **Text-to-Speech**: Robot speaks responses on Raspberry Pi using espeak
+- 🤖 **ROS Integration**: Full autonomous navigation mode with ROS bridge
+- 🧠 **Advanced Mental Health Monitoring**: Real-time emotion tracking with crisis detection
+- 🎨 **Enhanced UI**: Split-panel interface with animated emotions and camera view
+- 📱 **Mobile App Enhancements**: Camera view, control mode toggle, improved connectivity
+
+**See [INTEGRATION_UPDATE.md](INTEGRATION_UPDATE.md) for detailed documentation.**
+
 ## 🧠 Mental Health Focus
 
 This robot is designed to:
@@ -18,12 +30,16 @@ This robot is designed to:
 
 ### Mental Health Support
 - **Empathetic Conversations**: Powered by Google's Gemini AI with mental health-focused prompting
-- **Multimodal Interactions**: Text, voice, and image processing for richer communication
+- **Real-time Emotion Tracking**: Monitors emotional patterns over time (last 50 interactions)
+- **Crisis Detection**: Automatically detects concerning keywords and escalates concern level
+- **Mental State Analysis**: Analyzes emotional trends and provides insights
+- **Concern Level Monitoring**: 0-10 scale tracking with automated recommendations
 - **Mood Tracking**: Log and monitor emotional patterns
 - **Crisis Resources**: Immediate access to professional help resources
 - **Breathing Exercises**: Guided relaxation techniques
 - **Positive Affirmations**: Daily encouragement and support
-- **Emotion Recognition**: Detects anxiety, stress, sadness, and more
+- **Enhanced Emotion Recognition**: Detects anxiety, stress, sadness, anger, and more
+- **Personalized Recommendations**: Based on current mental state and concern level
 
 ### Personal Assistance
 - **Medication Reminders**: Never miss important doses
@@ -34,14 +50,18 @@ This robot is designed to:
 - **Image Analysis**: Visual context understanding for better assistance
 
 ### Technical Features
+- **Live Camera Streaming**: Real-time video feed at 10 FPS from Raspberry Pi camera
+- **Text-to-Speech**: Offline speech synthesis on Raspberry Pi (espeak)
 - **Voice Interaction**: Natural conversation via Gemini AI
 - **Multimodal API**: Process text, images, and audio simultaneously
-- **Animated Face Display**: Expressive, comforting presence
+- **Animated Face Display**: Expressive emotions with advanced animations
 - **Emotion Synchronization**: Smooth face/audio alignment
-- **Autonomous Movement**: Physical robot capabilities
-- **WebSocket Communication**: Real-time responsiveness with authentication
-- **ROS Integration**: Full Robot Operating System support
-- **Mobile App**: Android/iOS app for remote control (Flutter)
+- **Autonomous Movement**: Physical robot capabilities with ROS navigation
+- **ROS Integration**: Full Robot Operating System support with autonomous mode
+- **WebSocket Communication**: Real-time responsiveness with multiple connection types
+- **Mental Health Monitoring**: Real-time emotion tracking and crisis detection
+- **Mobile App**: Android/iOS app with camera view and full control (Flutter)
+- **Control Modes**: Manual control or autonomous ROS navigation
 - **Security**: Token-based authentication and encrypted connections
 - **Privacy-First**: All data stays on your device
 
@@ -559,6 +579,7 @@ controller.stop()
 
 ## 📚 Additional Documentation
 
+- **[Integration Update](INTEGRATION_UPDATE.md)** - 🆕 Latest features: Camera, Speech, ROS, Mental Health Monitoring
 - **[Mental Health Features](MENTAL_HEALTH_FEATURES.md)** - Comprehensive mental health support documentation
 - **[Multimodal API Guide](downloads/multimodal-api-guide.md)** - Complete guide for multimodal interactions
 - **[4-Wheel Setup Guide](downloads/4-wheel-setup-guide.md)** - Detailed setup guide for 4-wheel motor control

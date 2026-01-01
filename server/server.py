@@ -7,6 +7,7 @@ import asyncio
 import logging
 import os
 from typing import Dict
+from datetime import datetime
 from dotenv import load_dotenv
 import google.generativeai as genai
 import uvicorn
@@ -190,7 +191,6 @@ async def handle_text_command(data: Dict):
     robot_state.user_emotion = detect_emotion(text)
     
     # Track emotion history for mental health monitoring
-    from datetime import datetime
     robot_state.user_emotion_history.append(robot_state.user_emotion)
     if len(robot_state.user_emotion_history) > 50:  # Keep last 50 emotions
         robot_state.user_emotion_history.pop(0)
@@ -244,7 +244,7 @@ def detect_emotion(text: str) -> str:
     if any(keyword in text for keyword in crisis_keywords):
         robot_state.concern_level = 10
         robot_state.mental_health_insights.append({
-            'timestamp': asyncio.get_event_loop().time(),
+            'timestamp': datetime.now().isoformat(),
             'level': 'critical',
             'message': 'Crisis keywords detected - immediate intervention needed'
         })

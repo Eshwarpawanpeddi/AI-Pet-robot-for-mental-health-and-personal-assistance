@@ -10,6 +10,7 @@ import websockets
 from datetime import datetime
 import base64
 import io
+import subprocess
 
 # Configure logging
 logging.basicConfig(
@@ -318,10 +319,9 @@ class RaspberryPiController:
             
             logger.info(f"Playing audio: {text}")
             
-            # Use pyttsx3 for offline TTS or espeak for simpler option
-            import subprocess
-            # Using espeak for simple TTS (should be installed on Pi)
-            subprocess.run(['espeak', text], check=False)
+            # Use espeak for simple TTS (should be installed on Pi)
+            # Non-blocking call
+            subprocess.Popen(['espeak', text])
             
         except Exception as e:
             logger.error(f"Error playing audio: {e}")
@@ -329,7 +329,6 @@ class RaspberryPiController:
     async def speak_text(self, text: str):
         """Text-to-speech on Raspberry Pi"""
         try:
-            import subprocess
             logger.info(f"Speaking: {text}")
             # Using espeak for offline TTS on Raspberry Pi
             subprocess.Popen(['espeak', '-v', 'en+f3', '-s', '150', text])
