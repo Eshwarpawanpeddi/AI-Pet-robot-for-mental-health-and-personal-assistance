@@ -305,6 +305,78 @@ async def broadcast_state():
 async def root():
     return FileResponse(os.path.join(frontend_dir, "face_display.html"))
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring"""
+    return {
+        'status': 'healthy',
+        'server': 'running',
+        'components': {
+            'gemini_ai': robot_state.gemini_session is not None,
+            'raspberry_pi': robot_state.raspberry_pi_client is not None,
+            'ros_bridge': robot_state.ros_client is not None,
+            'camera': robot_state.camera_enabled,
+            'web_clients': len(robot_state.connected_clients)
+        }
+    }
+
+@app.get("/api/status")
+async def get_full_status():
+    """Get comprehensive system status"""
+    return {
+        'server': {
+            'running': True,
+            'version': '2.0',
+            'uptime': 'running'
+        },
+        'connections': {
+            'web_clients': len(robot_state.connected_clients),
+            'raspberry_pi': {
+                'connected': robot_state.raspberry_pi_client is not None,
+                'camera_enabled': robot_state.camera_enabled,
+                'features': ['motor_control', 'camera', 'tts']
+            },
+            'ros_bridge': {
+                'connected': robot_state.ros_client is not None,
+                'mode': robot_state.control_mode,
+                'features': ['autonomous_navigation', 'obstacle_avoidance']
+            }
+        },
+        'ai': {
+            'gemini': {
+                'initialized': robot_state.gemini_session is not None,
+                'status': 'ready' if robot_state.gemini_session else 'not_configured'
+            }
+        },
+        'mental_health': {
+            'tracking_enabled': True,
+            'concern_level': robot_state.concern_level,
+            'emotions_tracked': len(robot_state.user_emotion_history),
+            'insights_available': len(robot_state.mental_health_insights)
+        },
+        'features': {
+            'camera_streaming': {
+                'available': robot_state.raspberry_pi_client is not None,
+                'active': robot_state.camera_enabled,
+                'clients': len(robot_state.camera_clients)
+            },
+            'speech': {
+                'tts_available': robot_state.raspberry_pi_client is not None,
+                'listening': robot_state.is_listening,
+                'speaking': robot_state.is_speaking
+            },
+            'control': {
+                'mode': robot_state.control_mode,
+                'manual_available': robot_state.raspberry_pi_client is not None,
+                'autonomous_available': robot_state.ros_client is not None
+            }
+        },
+        'setup_instructions': {
+            'raspberry_pi': 'Run: cd hardware/raspberry_pi && python3 raspberry_pi_controller.py' if not robot_state.raspberry_pi_client else 'Connected ✓',
+            'ros_bridge': 'Run: roslaunch pet_robot_ros ros_bridge.launch' if not robot_state.ros_client else 'Connected ✓'
+        }
+    }
+
 @app.get("/api/state")
 async def get_state():
     """Get current robot state"""
@@ -367,4 +439,91 @@ def get_recommendation(mental_state: str, concern_level: int) -> str:
         return "You're doing well! Keep up the positive habits."
 
 if __name__ == "__main__":
+    import sys
+    
+    logger.info("=" * 60)
+    logger.info("AI Pet Robot Server Starting...")
+    logger.info("=" * 60)
+    logger.info("")
+    logger.info("🚀 Server Configuration:")
+    logger.info(f"   - Host: 0.0.0.0")
+    logger.info(f"   - Port: 8000")
+    logger.info(f"   - Gemini API: {'✓ Configured' if GEMINI_API_KEY else '✗ Not configured'}")
+    logger.info("")
+    logger.info("📡 WebSocket Endpoints:")
+    logger.info("   - /ws/control     → Web/Mobile clients")
+    logger.info("   - /ws/raspberry_pi → Raspberry Pi hardware")
+    logger.info("   - /ws/ros         → ROS bridge (autonomous mode)")
+    logger.info("")
+    logger.info("🌐 Web Interface:")
+    logger.info("   - Main UI: http://localhost:8000")
+    logger.info("   - Features: Camera, Speech, Emotions, Controls")
+    logger.info("")
+    logger.info("📹 Camera Streaming:")
+    logger.info("   - Requires Raspberry Pi connection")
+    logger.info("   - Toggle in web interface or mobile app")
+    logger.info("   - Real-time JPEG streaming at ~10 FPS")
+    logger.info("")
+    logger.info("🔊 Audio/Speech:")
+    logger.info("   - Text-to-Speech on Raspberry Pi (espeak)")
+    logger.info("   - Automatic speech when AI responds")
+    logger.info("   - Toggle controls in web interface")
+    logger.info("")
+    logger.info("🤖 ROS Integration:")
+    logger.info("   - Launch ROS bridge separately:")
+    logger.info("     roslaunch pet_robot_ros ros_bridge.launch")
+    logger.info("   - Switch modes in web interface:")
+    logger.info("     • Manual → Direct Pi control")
+    logger.info("     • Autonomous → ROS navigation")
+    logger.info("")
+    logger.info("🧠 Mental Health Monitoring:")
+    logger.info("   - Real-time emotion tracking")
+    logger.info("   - Crisis detection enabled")
+    logger.info("   - API: GET /api/mental_health/insights")
+    logger.info("")
+    logger.info("📱 Mobile App:")
+    logger.info("   - Configure server IP in app settings")
+    logger.info("   - All features available remotely")
+    logger.info("")
+    logger.info("⚙️  To Enable All Features:")
+    logger.info("   1. Start this server (you're doing it now!)")
+    logger.info("   2. On Raspberry Pi:")
+    logger.info("      cd hardware/raspberry_pi")
+    logger.info("      python3 raspberry_pi_controller.py")
+    logger.info("   3. For autonomous mode (optional):")
+    logger.info("      roslaunch pet_robot_ros ros_bridge.launch")
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("Server is ready! Open http://localhost:8000 in your browser")
+    logger.info("=" * 60)
+    logger.info("")
+    
+    # Add a background task to periodically log connection status
+    async def log_status():
+        await asyncio.sleep(10)  # Wait for initial connections
+        while True:
+            logger.info("📊 Connection Status:")
+            logger.info(f"   - Web Clients: {len(robot_state.connected_clients)}")
+            logger.info(f"   - Raspberry Pi: {'✓ Connected' if robot_state.raspberry_pi_client else '✗ Not connected'}")
+            logger.info(f"   - ROS Bridge: {'✓ Connected' if robot_state.ros_client else '✗ Not connected'}")
+            logger.info(f"   - Camera: {'✓ Active' if robot_state.camera_enabled else '○ Inactive'}")
+            logger.info(f"   - Control Mode: {robot_state.control_mode.upper()}")
+            logger.info(f"   - Mental Health: Concern Level {robot_state.concern_level}/10")
+            logger.info("")
+            await asyncio.sleep(30)  # Log status every 30 seconds
+    
+    # Start status logging in background
+    @asynccontextmanager
+    async def lifespan_with_status(app: FastAPI):
+        # Initialize Gemini
+        await initialize_gemini()
+        # Start status logging
+        status_task = asyncio.create_task(log_status())
+        yield
+        # Cleanup
+        status_task.cancel()
+    
+    # Update app lifespan
+    app.router.lifespan_context = lifespan_with_status
+    
     uvicorn.run(app, host="0.0.0.0", port=8000)
