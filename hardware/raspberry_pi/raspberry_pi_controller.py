@@ -8,6 +8,8 @@ from threading import Thread, Lock
 import asyncio
 import websockets
 from datetime import datetime
+import base64
+import io
 
 # Configure logging
 logging.basicConfig(
@@ -69,6 +71,9 @@ class RaspberryPiController:
         self.current_speed = 0
         self.current_direction = "stop"
         self.pwm_motors = {}  # Store PWM instances
+        self.camera = None
+        self.camera_enabled = False
+        self.camera_streaming = False
         self.current_sensor_data = SensorData(
             timestamp=time.time(),
             touch_detected=False,
@@ -85,6 +90,9 @@ class RaspberryPiController:
         except ImportError:
             logger.warning("RPi.GPIO not available - running in simulation mode")
             self.GPIO = None
+        
+        # Initialize camera
+        self._init_camera()
         
         logger.info("Raspberry Pi Controller Initialized with 1-motor driver parallel setup")
     
@@ -120,6 +128,82 @@ class RaspberryPiController:
         
         logger.info(f"PWM initialized at {PWM_FREQUENCY}Hz for Left/Right channels")
     
+    def _init_camera(self):
+        """Initialize Pi camera"""
+        try:
+            from picamera2 import Picamera2
+            self.camera = Picamera2()
+            config = self.camera.create_preview_configuration(
+                main={"size": (640, 480), "format": "RGB888"}
+            )
+            self.camera.configure(config)
+            self.camera_enabled = True
+            logger.info("Camera initialized successfully")
+        except ImportError:
+            logger.warning("picamera2 not available - camera features disabled")
+            self.camera_enabled = False
+        except Exception as e:
+            logger.error(f"Failed to initialize camera: {e}")
+            self.camera_enabled = False
+    
+    async def start_camera_stream(self):
+        """Start streaming camera frames to server"""
+        if not self.camera_enabled or not self.camera:
+            logger.warning("Camera not available for streaming")
+            return
+        
+        self.camera_streaming = True
+        try:
+            self.camera.start()
+            logger.info("Camera streaming started")
+            
+            while self.camera_streaming and self.websocket:
+                try:
+                    # Capture frame
+                    frame = self.camera.capture_array()
+                    
+                    # Convert to JPEG
+                    from PIL import Image
+                    img = Image.fromarray(frame)
+                    buffer = io.BytesIO()
+                    img.save(buffer, format='JPEG', quality=70)
+                    buffer.seek(0)
+                    
+                    # Encode to base64
+                    img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+                    
+                    # Send to server
+                    await self.websocket.send(json.dumps({
+                        "type": "camera_frame",
+                        "frame": img_base64
+                    }))
+                    
+                    # Limit frame rate to ~10 FPS
+                    await asyncio.sleep(0.1)
+                    
+                except Exception as e:
+                    logger.error(f"Error streaming camera frame: {e}")
+                    await asyncio.sleep(1)
+                    
+        except Exception as e:
+            logger.error(f"Camera streaming error: {e}")
+        finally:
+            if self.camera:
+                try:
+                    self.camera.stop()
+                except:
+                    pass
+            logger.info("Camera streaming stopped")
+    
+    async def stop_camera_stream(self):
+        """Stop camera streaming"""
+        self.camera_streaming = False
+        if self.camera:
+            try:
+                self.camera.stop()
+            except:
+                pass
+
     async def connect_to_server(self):
         """Connect to central server via WebSocket"""
         while True:
@@ -154,6 +238,10 @@ class RaspberryPiController:
                 await self.play_audio(data.get("audio"))
             elif msg_type == "get_status":
                 await self.send_status()
+            elif msg_type == "start_camera":
+                asyncio.create_task(self.start_camera_stream())
+            elif msg_type == "stop_camera":
+                await self.stop_camera_stream()
                 
         except json.JSONDecodeError as e:
             logger.error(f"JSON decode error: {e}")

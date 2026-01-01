@@ -23,11 +23,16 @@ class RobotState:
         self.emotion = "neutral"        # Robot face emotion
         self.user_emotion = "neutral"   # Tracked sentiment of the user
         self.is_listening = False
+        self.is_speaking = False
         self.battery_level = 100
         self.connected_clients = []
         self.raspberry_pi_client = None
         self.gemini_session = None
         self.last_transcript = ""
+        self.camera_enabled = False
+        self.camera_clients = []  # Clients viewing camera feed
+        self.control_mode = "manual"  # manual or autonomous
+        self.latest_camera_frame = None
 
 robot_state = RobotState()
 
@@ -70,11 +75,31 @@ async def websocket_control(websocket: WebSocket):
                 # Route movement commands to Raspberry Pi
                 if robot_state.raspberry_pi_client:
                     await robot_state.raspberry_pi_client.send_json(data)
+            elif command_type == 'start_camera':
+                await start_camera()
+            elif command_type == 'stop_camera':
+                await stop_camera()
+            elif command_type == 'subscribe_camera':
+                if websocket not in robot_state.camera_clients:
+                    robot_state.camera_clients.append(websocket)
+            elif command_type == 'unsubscribe_camera':
+                if websocket in robot_state.camera_clients:
+                    robot_state.camera_clients.remove(websocket)
+            elif command_type == 'set_mode':
+                robot_state.control_mode = data.get('mode', 'manual')
+            elif command_type == 'start_listening':
+                robot_state.is_listening = True
+                await broadcast_state()
+            elif command_type == 'stop_listening':
+                robot_state.is_listening = False
+                await broadcast_state()
             
             await broadcast_state()
     except:
         if websocket in robot_state.connected_clients:
             robot_state.connected_clients.remove(websocket)
+        if websocket in robot_state.camera_clients:
+            robot_state.camera_clients.remove(websocket)
 
 @app.websocket("/ws/raspberry_pi")
 async def websocket_raspberry_pi(websocket: WebSocket):
@@ -83,10 +108,37 @@ async def websocket_raspberry_pi(websocket: WebSocket):
     logger.info("Raspberry Pi hardware connected")
     try:
         while True:
-            await websocket.receive_json()
+            data = await websocket.receive_json()
+            msg_type = data.get('type')
+            
+            if msg_type == 'camera_frame':
+                # Broadcast camera frame to subscribed clients
+                robot_state.latest_camera_frame = data.get('frame')
+                for client in robot_state.camera_clients:
+                    try:
+                        await client.send_json({
+                            'type': 'camera_frame',
+                            'frame': data.get('frame')
+                        })
+                    except:
+                        pass
     except:
         robot_state.raspberry_pi_client = None
         logger.info("Raspberry Pi disconnected")
+
+async def start_camera():
+    """Start camera streaming from Raspberry Pi"""
+    if robot_state.raspberry_pi_client:
+        await robot_state.raspberry_pi_client.send_json({"type": "start_camera"})
+        robot_state.camera_enabled = True
+        logger.info("Camera streaming started")
+
+async def stop_camera():
+    """Stop camera streaming from Raspberry Pi"""
+    if robot_state.raspberry_pi_client:
+        await robot_state.raspberry_pi_client.send_json({"type": "stop_camera"})
+        robot_state.camera_enabled = False
+        logger.info("Camera streaming stopped")
 
 async def handle_text_command(data: Dict):
     text = data.get('text', '')
@@ -125,7 +177,11 @@ async def broadcast_state():
         'user_emotion': robot_state.user_emotion,
         'battery_level': robot_state.battery_level,
         'is_listening': robot_state.is_listening,
-        'last_transcript': robot_state.last_transcript
+        'is_speaking': robot_state.is_speaking,
+        'last_transcript': robot_state.last_transcript,
+        'camera_enabled': robot_state.camera_enabled,
+        'control_mode': robot_state.control_mode,
+        'raspberry_pi_connected': robot_state.raspberry_pi_client is not None
     }
     for client in robot_state.connected_clients:
         try:

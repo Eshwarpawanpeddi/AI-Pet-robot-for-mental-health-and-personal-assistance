@@ -2,25 +2,168 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Pet Robot Face - Fullscreen Edition</title>
+    <title>Pet Robot Control - Enhanced Edition</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        .main-container {
+            display: flex;
+            height: 100vh;
+            background: #000;
+        }
+        
+        .left-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .right-panel {
+            width: 400px;
+            background: #1a1a1a;
+            padding: 20px;
+            overflow-y: auto;
+            border-left: 2px solid #333;
+        }
+        
+        .camera-view {
+            width: 100%;
+            height: 300px;
+            background: #000;
+            border: 2px solid #333;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        .camera-view img {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 6px;
+        }
+        
+        .camera-placeholder {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .audio-controls {
+            margin-top: 20px;
+        }
+        
+        .audio-btn {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .audio-btn.listening {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .audio-btn.idle {
+            background: #10b981;
+            color: white;
+        }
+        
+        .audio-btn:hover {
+            opacity: 0.8;
+        }
+        
+        .mode-toggle {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .mode-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background: #333;
+            color: white;
+        }
+        
+        .mode-btn.active {
+            background: #667eea;
+        }
+        
+        .section-title {
+            color: #fff;
+            font-size: 18px;
+            margin: 20px 0 10px 0;
+            font-weight: bold;
+        }
+        
+        .connection-status {
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        
+        .connection-status.connected {
+            background: #10b981;
+            color: white;
+        }
+        
+        .connection-status.disconnected {
+            background: #ef4444;
+            color: white;
+        }
+    </style>
 </head>
 <body>
-    <div class="robot-container">
-        <canvas id="faceCanvas" class="face-canvas"></canvas>
-        
-        <div class="status-bar">
-            <div class="status-item">User Feel: <span id="userEmotion" style="color:#4ade80">Neutral</span></div>
-            <div class="status-item">Robot Feel: <span id="robotEmotion" style="color:#fbbf24">Neutral</span></div>
-            <div class="status-item">Battery: <span id="batteryLevel">100</span>%</div>
-        </div>
+    <div class="main-container">
+        <div class="left-panel">
+            <div class="robot-container">
+                <canvas id="faceCanvas" class="face-canvas"></canvas>
+                
+                <div class="status-bar">
+                    <div class="status-item">User Feel: <span id="userEmotion" style="color:#4ade80">Neutral</span></div>
+                    <div class="status-item">Robot Feel: <span id="robotEmotion" style="color:#fbbf24">Neutral</span></div>
+                    <div class="status-item">Battery: <span id="batteryLevel">100</span>%</div>
+                    <div class="status-item">Mode: <span id="controlMode">Manual</span></div>
+                </div>
 
-        <div class="control-panel">
-            <button class="btn" onclick="sendText('How are you?')">👋 Say Hello</button>
-            <button class="btn" onclick="changeEmotion('happy')">😊 Happy</button>
-            <button class="btn" onclick="changeEmotion('sad')">😢 Sad (Cry)</button>
-            <button class="btn" onclick="changeEmotion('angry')">💢 Angry</button>
-            <button class="btn" onclick="changeEmotion('neutral')">😐 Neutral</button>
+                <div class="control-panel">
+                    <button class="btn" onclick="sendText('How are you?')">👋 Say Hello</button>
+                    <button class="btn" onclick="changeEmotion('happy')">😊 Happy</button>
+                    <button class="btn" onclick="changeEmotion('sad')">😢 Sad (Cry)</button>
+                    <button class="btn" onclick="changeEmotion('angry')">💢 Angry</button>
+                    <button class="btn" onclick="changeEmotion('neutral')">😐 Neutral</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="right-panel">
+            <div class="connection-status" id="connectionStatus">Connecting...</div>
+            
+            <div class="section-title">📹 Camera View</div>
+            <div class="camera-view" id="cameraView">
+                <div class="camera-placeholder">Camera Off</div>
+            </div>
+            <button class="audio-btn idle" id="cameraBtn" onclick="toggleCamera()">Start Camera</button>
+            
+            <div class="section-title">🎤 Audio Controls</div>
+            <button class="audio-btn idle" id="listenBtn" onclick="toggleListening()">🎤 Start Listening</button>
+            <button class="audio-btn idle" id="speakBtn" onclick="toggleSpeaking()">🔊 Robot Speak</button>
+            
+            <div class="section-title">🎮 Control Mode</div>
+            <div class="mode-toggle">
+                <button class="mode-btn active" id="manualBtn" onclick="setMode('manual')">Manual</button>
+                <button class="mode-btn" id="rosBtn" onclick="setMode('autonomous')">ROS/Auto</button>
+            </div>
         </div>
     </div>
 
@@ -33,6 +176,8 @@
                 this.eyeOpen = 1.0;
                 this.time = 0;
                 this.tears = [];
+                this.angerShake = 0;
+                this.angerIntensity = 0;
                 
                 // Initialize sizing
                 this.resize();
@@ -52,6 +197,13 @@
             animate() {
                 this.time += 0.05;
                 this.eyeOpen = (this.time % 5 < 0.15) ? 0.1 : 1.0;
+                
+                // Animate anger shake
+                if (this.emotion === 'angry') {
+                    this.angerShake = Math.sin(this.time * 3) * 5;
+                    this.angerIntensity = Math.abs(Math.sin(this.time * 2)) * 0.5 + 0.5;
+                }
+                
                 this.draw();
                 requestAnimationFrame(() => this.animate());
             }
@@ -65,11 +217,36 @@
                 if (this.emotion === 'sad') {
                     this.drawTears();
                 }
+                
+                if (this.emotion === 'angry') {
+                    this.drawAngerEffects();
+                }
 
                 // Spacing between eyes scales with screen width
                 const eyeSpacing = this.canvas.width * 0.16;
-                this.drawEye(this.centerX - eyeSpacing, this.centerY, color, 'L');
-                this.drawEye(this.centerX + eyeSpacing, this.centerY, color, 'R');
+                const shakeX = this.emotion === 'angry' ? this.angerShake : 0;
+                this.drawEye(this.centerX - eyeSpacing + shakeX, this.centerY, color, 'L');
+                this.drawEye(this.centerX + eyeSpacing + shakeX, this.centerY, color, 'R');
+            }
+            
+            drawAngerEffects() {
+                // Add pulsing red background effect
+                const alpha = this.angerIntensity * 0.2;
+                this.ctx.fillStyle = `rgba(255, 80, 80, ${alpha})`;
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Add anger lines/sparks
+                this.ctx.strokeStyle = `rgba(255, 100, 100, ${this.angerIntensity})`;
+                this.ctx.lineWidth = 3;
+                for (let i = 0; i < 3; i++) {
+                    const angle = (this.time * 2 + i * Math.PI * 2 / 3) % (Math.PI * 2);
+                    const x = this.centerX + Math.cos(angle) * 150;
+                    const y = this.centerY + Math.sin(angle) * 100;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, y);
+                    this.ctx.lineTo(x + Math.cos(angle) * 30, y + Math.sin(angle) * 30);
+                    this.ctx.stroke();
+                }
             }
 
             drawTears() {
@@ -149,9 +326,24 @@
         }
 
         const eyes = new ExpressiveEyesRenderer('faceCanvas');
+        
+        let cameraActive = false;
+        let isListening = false;
+        let isSpeaking = false;
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const ws = new WebSocket(`${protocol}//${window.location.host}/ws/control`);
+        
+        ws.onopen = () => {
+            document.getElementById('connectionStatus').className = 'connection-status connected';
+            document.getElementById('connectionStatus').textContent = '✓ Connected to Server';
+            ws.send(JSON.stringify({ type: 'subscribe_camera' }));
+        };
+        
+        ws.onclose = () => {
+            document.getElementById('connectionStatus').className = 'connection-status disconnected';
+            document.getElementById('connectionStatus').textContent = '✗ Disconnected';
+        };
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
@@ -161,6 +353,17 @@
                 document.getElementById('userEmotion').textContent = state.user_emotion;
                 document.getElementById('robotEmotion').textContent = state.emotion;
                 document.getElementById('batteryLevel').textContent = state.battery_level;
+                document.getElementById('controlMode').textContent = state.control_mode || 'Manual';
+                
+                // Update connection status
+                if (state.raspberry_pi_connected) {
+                    document.getElementById('connectionStatus').className = 'connection-status connected';
+                    document.getElementById('connectionStatus').textContent = '✓ Connected - Pi Online';
+                }
+            } else if (data.type === 'camera_frame') {
+                // Display camera frame
+                const cameraView = document.getElementById('cameraView');
+                cameraView.innerHTML = `<img src="data:image/jpeg;base64,${data.frame}" alt="Camera Feed">`;
             }
         };
 
@@ -171,6 +374,55 @@
 
         function sendText(txt) {
             ws.send(JSON.stringify({ type: 'text', text: txt }));
+        }
+        
+        function toggleCamera() {
+            cameraActive = !cameraActive;
+            const btn = document.getElementById('cameraBtn');
+            if (cameraActive) {
+                ws.send(JSON.stringify({ type: 'start_camera' }));
+                btn.textContent = 'Stop Camera';
+                btn.className = 'audio-btn listening';
+            } else {
+                ws.send(JSON.stringify({ type: 'stop_camera' }));
+                btn.textContent = 'Start Camera';
+                btn.className = 'audio-btn idle';
+                document.getElementById('cameraView').innerHTML = '<div class="camera-placeholder">Camera Off</div>';
+            }
+        }
+        
+        function toggleListening() {
+            isListening = !isListening;
+            const btn = document.getElementById('listenBtn');
+            if (isListening) {
+                ws.send(JSON.stringify({ type: 'start_listening' }));
+                btn.textContent = '🎤 Listening...';
+                btn.className = 'audio-btn listening';
+            } else {
+                ws.send(JSON.stringify({ type: 'stop_listening' }));
+                btn.textContent = '🎤 Start Listening';
+                btn.className = 'audio-btn idle';
+            }
+        }
+        
+        function toggleSpeaking() {
+            isSpeaking = !isSpeaking;
+            const btn = document.getElementById('speakBtn');
+            if (isSpeaking) {
+                btn.textContent = '🔊 Speaking...';
+                btn.className = 'audio-btn listening';
+            } else {
+                btn.textContent = '🔊 Robot Speak';
+                btn.className = 'audio-btn idle';
+            }
+        }
+        
+        function setMode(mode) {
+            ws.send(JSON.stringify({ type: 'set_mode', mode: mode }));
+            
+            // Update UI
+            document.getElementById('manualBtn').className = mode === 'manual' ? 'mode-btn active' : 'mode-btn';
+            document.getElementById('rosBtn').className = mode === 'autonomous' ? 'mode-btn active' : 'mode-btn';
         }
     </script>
 </body>
