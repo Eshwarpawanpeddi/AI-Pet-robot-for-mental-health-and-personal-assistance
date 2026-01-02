@@ -1,0 +1,101 @@
+"""
+Shared state module for multi-port robot control system.
+This module maintains global state accessible across all server instances.
+"""
+import asyncio
+from typing import List, Dict, Optional
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+class RobotState:
+    """Centralized robot state shared across all servers"""
+    
+    def __init__(self):
+        # Emotion state
+        self.emotion = "neutral"        # Robot face emotion
+        self.user_emotion = "neutral"   # Tracked sentiment of the user
+        
+        # Audio state
+        self.is_listening = False
+        self.is_speaking = False
+        self.last_transcript = ""
+        
+        # Hardware state
+        self.battery_level = 100
+        self.camera_enabled = False
+        self.latest_camera_frame = None
+        
+        # Connection state
+        self.connected_clients = []
+        self.camera_clients = []
+        self.raspberry_pi_client = None
+        self.ros_client = None
+        self.gemini_session = None
+        
+        # Control state
+        self.control_mode = "manual"  # manual or autonomous
+        
+        # Mental health monitoring
+        self.user_emotion_history = []  # Track emotion over time
+        self.mental_health_insights = []
+        self.concern_level = 0  # 0-10 scale
+        
+        # Emotion display subscribers (for port 1000)
+        self.emotion_display_clients = []
+        
+        # Lock for thread-safe access
+        self._lock = asyncio.Lock()
+    
+    async def set_emotion(self, emotion: str):
+        """Set robot emotion and notify all subscribers"""
+        async with self._lock:
+            self.emotion = emotion
+            logger.info(f"Emotion changed to: {emotion}")
+            await self._notify_emotion_subscribers()
+    
+    async def _notify_emotion_subscribers(self):
+        """Notify all emotion display clients of emotion change"""
+        for client in self.emotion_display_clients[:]:
+            try:
+                await client.send_json({
+                    'type': 'emotion_update',
+                    'emotion': self.emotion
+                })
+            except Exception as e:
+                logger.error(f"Failed to notify emotion subscriber: {e}")
+                self.emotion_display_clients.remove(client)
+    
+    async def add_emotion_subscriber(self, client):
+        """Add a client to receive emotion updates"""
+        async with self._lock:
+            if client not in self.emotion_display_clients:
+                self.emotion_display_clients.append(client)
+                logger.info(f"Added emotion subscriber. Total: {len(self.emotion_display_clients)}")
+    
+    async def remove_emotion_subscriber(self, client):
+        """Remove a client from emotion updates"""
+        async with self._lock:
+            if client in self.emotion_display_clients:
+                self.emotion_display_clients.remove(client)
+                logger.info(f"Removed emotion subscriber. Total: {len(self.emotion_display_clients)}")
+    
+    def get_state_dict(self) -> Dict:
+        """Get current state as dictionary"""
+        return {
+            'emotion': self.emotion,
+            'user_emotion': self.user_emotion,
+            'battery_level': self.battery_level,
+            'is_listening': self.is_listening,
+            'is_speaking': self.is_speaking,
+            'last_transcript': self.last_transcript,
+            'camera_enabled': self.camera_enabled,
+            'control_mode': self.control_mode,
+            'raspberry_pi_connected': self.raspberry_pi_client is not None,
+            'ros_connected': self.ros_client is not None,
+            'concern_level': self.concern_level
+        }
+
+# Global shared state instance
+robot_state = RobotState()
