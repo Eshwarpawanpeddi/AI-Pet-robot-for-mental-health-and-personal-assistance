@@ -45,11 +45,17 @@ class RobotState:
         # Emotion display subscribers (for port 1000)
         self.emotion_display_clients = []
         
-        # Lock for thread-safe access
-        self._lock = asyncio.Lock()
+        # Lock for thread-safe access (will be initialized in async context)
+        self._lock = None
+    
+    async def _ensure_lock(self):
+        """Lazily initialize the lock in async context"""
+        if self._lock is None:
+            self._lock = asyncio.Lock()
     
     async def set_emotion(self, emotion: str):
         """Set robot emotion and notify all subscribers"""
+        await self._ensure_lock()
         async with self._lock:
             self.emotion = emotion
             logger.info(f"Emotion changed to: {emotion}")
@@ -69,6 +75,7 @@ class RobotState:
     
     async def add_emotion_subscriber(self, client):
         """Add a client to receive emotion updates"""
+        await self._ensure_lock()
         async with self._lock:
             if client not in self.emotion_display_clients:
                 self.emotion_display_clients.append(client)
@@ -76,6 +83,7 @@ class RobotState:
     
     async def remove_emotion_subscriber(self, client):
         """Remove a client from emotion updates"""
+        await self._ensure_lock()
         async with self._lock:
             if client in self.emotion_display_clients:
                 self.emotion_display_clients.remove(client)
