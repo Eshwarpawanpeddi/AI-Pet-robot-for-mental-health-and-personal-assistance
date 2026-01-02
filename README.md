@@ -4,6 +4,13 @@ An empathetic AI-powered companion robot designed specifically for **mental heal
 
 ## 🎉 Latest Updates (January 2026)
 
+### 🆕 Multi-Port Architecture (v2.0)
+- **Port 8000**: Primary control server (movement, camera, AI, ROS)
+- **Port 1000**: Dedicated emotion display server (animated face)
+- **Port 3000**: Mobile-friendly web control interface
+- **Emotion Synchronization**: Automatic sync across all ports
+- **Flexible Deployment**: Run servers independently or together
+
 ### New Features Added:
 - 🎥 **Live Camera Streaming**: Real-time video feed from Raspberry Pi to web and mobile interfaces
 - 🔊 **Text-to-Speech**: Robot speaks responses on Raspberry Pi using espeak
@@ -12,7 +19,7 @@ An empathetic AI-powered companion robot designed specifically for **mental heal
 - 🎨 **Enhanced UI**: Split-panel interface with animated emotions and camera view
 - 📱 **Mobile App Enhancements**: Camera view, control mode toggle, improved connectivity
 
-**See [INTEGRATION_UPDATE.md](INTEGRATION_UPDATE.md) for detailed documentation.**
+**See [SETUP_GUIDE.md](SETUP_GUIDE.md) for complete setup instructions.**
 
 ## 🧠 Mental Health Focus
 
@@ -67,69 +74,66 @@ This robot is designed to:
 
 ## 🏗️ System Architecture
 
+### Multi-Port Server Setup
+
+The system uses **three separate servers** for different purposes:
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                  MOBILE APP / WEB CLIENT                         │
+│                     CLIENT INTERFACES                            │
 │  ┌──────────────┐ ┌──────────────┐ ┌─────────────────────────┐ │
-│  │ Voice Input  │ │ Manual Ctrl  │ │ Animated Face Display   │ │
-│  │ (Gemini AI)  │ │ (Joystick)   │ │ (Shows Emotions)        │ │
+│  │ Desktop Web  │ │ Mobile Web   │ │ Emotion Display         │ │
+│  │ Port 8000    │ │ Port 3000    │ │ Port 1000               │ │
 │  └──────┬───────┘ └──────┬───────┘ └────────────┬────────────┘ │
-│         └────────────────┼──────────────────────┘               │
-│                 WebSocket/HTTP (Real-time)                       │
-└─────────────────────────┼─────────────────────────────────────┘
-                          │
-         ┌────────────────┼────────────────┐
-         │                │                │
-         ▼                ▼                ▼
-┌──────────────────────────────────────────────┐
-│     CENTRAL SERVER (Processing Core)          │
-│  ┌────────────────────────────────────────┐  │
-│  │ Gemini AI Integration                   │  │
-│  │ - Voice Processing                      │  │
-│  │ - LLM Response Generation               │  │
-│  │ - Emotion Detection & Synthesis         │  │
-│  └────────────────────────────────────────┘  │
-│  ┌────────────────────────────────────────┐  │
-│  │ WebSocket Hub & Command Routing         │  │
-│  │ - Raspberry Pi Motor & Face (Wi-Fi)     │  │
-│  │ - Mobile App Control (WebSocket)        │  │
-│  │ - Mode Toggle (Manual/Autonomous)       │  │
-│  └────────────────────────────────────────┘  │
-└──────────────┬───────────────────────────────┘
-               │
-      WebSocket│
-       (Wi-Fi)│
-               │
-       ┌───────▼────────────────────┐
-       │   RASPBERRY PI 4           │
-       │  (Motor Control & Display) │
-       │  ┌──────────────────────┐  │
-       │  │ GPIO Motor Control   │  │
-       │  │ 2x L298N Drivers     │  │
-       │  │ 4-Wheel Setup        │  │
-       │  └──────────────────────┘  │
-       │  ┌──────────────────────┐  │
-       │  │ HDMI Face Display    │  │
-       │  │ Real-time Render     │  │
-       │  └──────────────────────┘  │
-       │  ┌──────────────────────┐  │
-       │  │ Audio Output         │  │
-       │  │ (Audio Jack)         │  │
-       │  └──────────────────────┘  │
-       └─────────┬──────────────────┘
-                 │
-          ┌──────┴──────┐
-          │             │
-    ┌─────▼────┐  ┌────▼─────┐
-    │ L298N #1 │  │ L298N #2 │
-    └─────┬────┘  └────┬─────┘
-          │            │
-      ┌───┴───┐    ┌───┴───┐
-      │       │    │       │
-      ▼       ▼    ▼       ▼
-   Motor A Motor B Motor C Motor D
-   (Front L)(Front R)(Rear L)(Rear R)
+└─────────┼────────────────┼──────────────────────┼──────────────┘
+          │                │                      │
+          ▼                ▼                      ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                    SERVER CLUSTER (Your Computer)                 │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │ Port 8000: Primary Control Server                          │  │
+│  │ - Movement control (manual/autonomous)                     │  │
+│  │ - Camera streaming                                         │  │
+│  │ - Gemini AI integration                                    │  │
+│  │ - Mental health monitoring                                 │  │
+│  │ - WebSocket: /ws/control, /ws/raspberry_pi, /ws/ros       │  │
+│  └──────────┬──────────────────────────────┬──────────────────┘  │
+│             │                              │                      │
+│  ┌──────────▼─────────────┐  ┌────────────▼──────────────────┐  │
+│  │ Port 1000:             │  │ Port 3000:                    │  │
+│  │ Emotion Display        │  │ Mobile Web Interface          │  │
+│  │ - Animated face        │  │ - Touch controls              │  │
+│  │ - Auto-sync emotions   │  │ - Camera view                 │  │
+│  │ - Full-screen display  │  │ - Lightweight UI              │  │
+│  └────────────────────────┘  └───────────────────────────────┘  │
+└──────────┬───────────────────────────────────────────────────────┘
+           │
+           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                  RASPBERRY PI (Robot Hardware)                    │
+│  - Motor Control (4 wheels via 2x L298N)                         │
+│  - Camera (USB or Pi Camera)                                     │
+│  - Speaker/TTS (espeak)                                          │
+│  - Connects to: ws://SERVER_IP:8000/ws/raspberry_pi             │
+└──────────┬───────────────────────────────────────────────────────┘
+           │
+           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                    ROS SYSTEM (Optional)                          │
+│  - Autonomous navigation                                         │
+│  - SLAM and mapping                                              │
+│  - Obstacle avoidance                                            │
+│  - Connects to: ws://SERVER_IP:8000/ws/ros                       │
+└──────────────────────────────────────────────────────────────────┘
 ```
+
+### Port Breakdown
+
+| Port | Purpose | Features |
+|------|---------|----------|
+| **8000** | Primary Control | Movement, camera, AI, ROS, mental health |
+| **1000** | Emotion Display | Dedicated animated face, auto-sync |
+| **3000** | Mobile Web | Touch-optimized controls, lightweight |
 
 ## 📋 Prerequisites
 
@@ -153,7 +157,9 @@ This robot is designed to:
 
 ## 🚀 Quick Start
 
-### Option 1: Standard Setup (FastAPI Server)
+### Multi-Port Setup
+
+This system runs three servers on different ports. You can run them all together or separately.
 
 ### 1. Clone the Repository
 
@@ -162,40 +168,96 @@ git clone https://github.com/Eshwarpawanpeddi/AI-Pet-robot-for-mental-health-and
 cd AI-Pet-robot-for-mental-health-and-personal-assistance
 ```
 
-### 2. Server Setup (Laptop)
+### 2. Server Setup (Your Computer)
 
-#### Option A: Using Docker (Recommended)
+#### Install Dependencies
+```bash
+cd server
+pip install -r requirements.txt
+```
 
+#### Configure Environment
 ```bash
 # Copy environment template
 cp .env.example .env
 
 # Edit .env and add your Gemini API key
 nano .env
-
-# Start the server
-docker-compose up -d
-
-# View logs
-docker-compose logs -f robot-server
 ```
 
-#### Option B: Local Installation
+Add this line to `.env`:
+```
+GEMINI_API_KEY=your-actual-api-key-here
+```
 
+Get your API key from: https://makersuite.google.com/app/apikey
+
+#### Start All Servers
+
+**Option A: Start All Three Servers (Recommended)**
 ```bash
-cd server
-pip install -r requirements.txt
-
-# Set environment variables
-export GEMINI_API_KEY="your-api-key-here"
-
-# Run server
-python server.py
+python launch_all.py
 ```
 
-The server will be available at `http://localhost:8000`
+This starts:
+- **Port 8000**: Primary control server
+- **Port 1000**: Emotion display server
+- **Port 3000**: Mobile web interface
 
-### 3. Raspberry Pi Setup
+**Option B: Start Servers Individually**
+```bash
+# Terminal 1 - Primary server (port 8000)
+python server.py
+
+# Terminal 2 - Emotion display (port 1000)
+python emotion_display_server.py
+
+# Terminal 3 - Mobile web interface (port 3000)
+python mobile_web_server.py
+```
+
+**Option C: Other Launch Modes**
+```bash
+# All servers + hardware simulation
+python launch_all.py --full
+
+# All servers + Pi simulation
+python launch_all.py --with-pi
+
+# Only primary server (legacy mode)
+python launch_all.py --server-only
+```
+
+#### Verify Servers are Running
+```bash
+# Check primary server
+curl http://localhost:8000/health
+
+# Check emotion display
+curl http://localhost:1000/health
+
+# Check mobile web
+curl http://localhost:3000/health
+```
+
+### 3. Access the Interfaces
+
+**Primary Control (Port 8000)**
+- URL: `http://localhost:8000`
+- Features: Full robot control, camera, AI conversation
+
+**Emotion Display (Port 1000)**
+- URL: `http://localhost:1000`
+- Features: Animated face, emotion display
+- Best viewed full-screen on a dedicated monitor
+
+**Mobile Web Interface (Port 3000)**
+- URL: `http://localhost:3000` or `http://YOUR_IP:3000` on mobile
+- Features: Touch controls, camera view, emotion buttons
+
+### 4. Raspberry Pi Setup
+
+### 4. Raspberry Pi Setup
 
 ```bash
 # On Raspberry Pi
@@ -203,8 +265,8 @@ cd hardware/raspberry_pi
 
 # Install dependencies
 sudo apt-get update
-sudo apt-get install -y python3-pip python3-websockets python3-rpi.gpio
-pip3 install websockets asyncio
+sudo apt-get install -y python3-pip python3-websockets python3-rpi.gpio espeak
+pip3 install websockets asyncio picamera opencv-python-headless
 
 # Update the SERVER_URL in raspberry_pi_controller.py
 # Edit the file and set SERVER_URL to your server's IP
@@ -215,49 +277,13 @@ nano raspberry_pi_controller.py
 python3 raspberry_pi_controller.py
 ```
 
-**Note**: The Raspberry Pi will:
-- Connect to the central server via WebSocket
-- Control 4 DC motors via 2 L298N motor drivers using GPIO
-- Render face animations on HDMI display
-- Play audio through the audio jack
-- Receive emotion and motor control updates in real-time
+**Note**: The Raspberry Pi connects to **port 8000** (primary server) and handles:
+- Motor control via GPIO
+- Camera streaming
+- Face display (if HDMI connected)
+- Audio output via TTS
 
-**GPIO Pin Configuration**:
-The Raspberry Pi uses the following GPIO pins for motor control:
-
-**Motor Driver 1 (Motors A & B - Front Wheels)**:
-- GPIO17 → Motor A IN1 (Direction 1)
-- GPIO27 → Motor A IN2 (Direction 2)
-- GPIO22 → Motor A ENA (PWM Speed Control)
-- GPIO23 → Motor B IN3 (Direction 1)
-- GPIO24 → Motor B IN4 (Direction 2)
-- GPIO25 → Motor B ENB (PWM Speed Control)
-
-**Motor Driver 2 (Motors C & D - Rear Wheels)**:
-- GPIO5 → Motor C IN1 (Direction 1)
-- GPIO6 → Motor C IN2 (Direction 2)
-- GPIO13 → Motor C ENA (PWM Speed Control)
-- GPIO19 → Motor D IN3 (Direction 1)
-- GPIO26 → Motor D IN4 (Direction 2)
-- GPIO12 → Motor D ENB (PWM Speed Control)
-
-**Wiring Instructions**:
-1. Connect Raspberry Pi GPIO pins to L298N driver inputs as shown above
-2. Connect L298N OUT1/OUT2 to Motor A, OUT3/OUT4 to Motor B (Driver 1)
-3. Connect L298N OUT1/OUT2 to Motor C, OUT3/OUT4 to Motor D (Driver 2)
-4. Power both L298N drivers with 7-12V supply
-5. Connect all grounds together (Pi GND, both L298N GND, power supply GND)
-
-### 4. Access the Web Interface
-
-Open your browser and navigate to:
-```
-http://localhost:8000
-```
-
-You should see the animated robot face with control buttons.
-
-### Option 2: ROS Integration Setup
+### 5. ROS Integration (Optional - For Autonomous Mode)
 
 For advanced robotics features and ROS ecosystem integration:
 
@@ -579,11 +605,12 @@ controller.stop()
 
 ## 📚 Additional Documentation
 
-- **[Integration Update](INTEGRATION_UPDATE.md)** - 🆕 Latest features: Camera, Speech, ROS, Mental Health Monitoring
+- **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - 🆕 **Complete setup guide for multi-port architecture**
+- **[Integration Update](INTEGRATION_UPDATE.md)** - Latest features: Camera, Speech, ROS, Mental Health Monitoring
 - **[Mental Health Features](MENTAL_HEALTH_FEATURES.md)** - Comprehensive mental health support documentation
 - **[Multimodal API Guide](downloads/multimodal-api-guide.md)** - Complete guide for multimodal interactions
 - **[4-Wheel Setup Guide](downloads/4-wheel-setup-guide.md)** - Detailed setup guide for 4-wheel motor control
-- [Setup Guide](downloads/setup-guide.md) - Detailed setup instructions
+- [Setup Guide](downloads/setup-guide.md) - Legacy setup instructions
 - [Architecture](downloads/robot-architecture.md) - System architecture details
 - [API Integration](downloads/api-integration.md) - API documentation
 - [Hardware Code](downloads/hardware-code.md) - Hardware implementation
