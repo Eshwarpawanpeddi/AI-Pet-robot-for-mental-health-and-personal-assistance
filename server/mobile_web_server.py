@@ -167,7 +167,7 @@ async def root():
         
         .camera-view {
             width: 100%;
-            height: 250px;
+            height: 400px;
             background: rgba(0, 0, 0, 0.3);
             border-radius: 15px;
             margin-bottom: 20px;
@@ -282,6 +282,95 @@ async def root():
         .info-row:last-child {
             border-bottom: none;
         }
+        
+        .speed-control {
+            margin-top: 15px;
+        }
+        
+        .speed-slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .speed-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+        }
+        
+        .speed-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            border: none;
+        }
+        
+        .joystick-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px auto;
+            width: 200px;
+            height: 200px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            position: relative;
+        }
+        
+        .joystick-handle {
+            width: 80px;
+            height: 80px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            cursor: grab;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .joystick-handle:active {
+            cursor: grabbing;
+        }
+        
+        .mode-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .mode-tab {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .mode-tab.active {
+            background: white;
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .control-mode-content {
+            display: none;
+        }
+        
+        .control-mode-content.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -302,16 +391,34 @@ async def root():
         
         <div class="control-section">
             <h2>🎮 Movement</h2>
-            <div class="direction-pad">
-                <div></div>
-                <button class="direction-btn" onclick="move('forward')">⬆️</button>
-                <div></div>
-                <button class="direction-btn" onclick="move('left')">⬅️</button>
-                <button class="direction-btn" onclick="move('stop')">⏹️</button>
-                <button class="direction-btn" onclick="move('right')">➡️</button>
-                <div></div>
-                <button class="direction-btn" onclick="move('backward')">⬇️</button>
-                <div></div>
+            <div class="mode-tabs">
+                <button class="mode-tab active" onclick="switchControlMode('buttons')">Button Mode</button>
+                <button class="mode-tab" onclick="switchControlMode('joystick')">Joystick Mode</button>
+            </div>
+            
+            <div class="control-mode-content active" id="buttonMode">
+                <div class="direction-pad">
+                    <div></div>
+                    <button class="direction-btn" onclick="move('forward')" onmousedown="startMove('forward')" onmouseup="stopMove()" ontouchstart="startMove('forward')" ontouchend="stopMove()">⬆️</button>
+                    <div></div>
+                    <button class="direction-btn" onclick="move('left')" onmousedown="startMove('left')" onmouseup="stopMove()" ontouchstart="startMove('left')" ontouchend="stopMove()">⬅️</button>
+                    <button class="direction-btn" onclick="move('stop')">⏹️</button>
+                    <button class="direction-btn" onclick="move('right')" onmousedown="startMove('right')" onmouseup="stopMove()" ontouchstart="startMove('right')" ontouchend="stopMove()">➡️</button>
+                    <div></div>
+                    <button class="direction-btn" onclick="move('backward')" onmousedown="startMove('backward')" onmouseup="stopMove()" ontouchstart="startMove('backward')" ontouchend="stopMove()">⬇️</button>
+                    <div></div>
+                </div>
+            </div>
+            
+            <div class="control-mode-content" id="joystickMode">
+                <div class="joystick-container" id="joystickContainer">
+                    <div class="joystick-handle" id="joystickHandle"></div>
+                </div>
+            </div>
+            
+            <div class="speed-control">
+                <label>Speed: <span id="speedValue">50</span>%</label>
+                <input type="range" class="speed-slider" id="speedSlider" min="0" max="100" value="50" oninput="updateSpeed(this.value)">
             </div>
         </div>
         
@@ -344,6 +451,10 @@ async def root():
     
     <script>
         let cameraActive = false;
+        let currentSpeed = 50;
+        let moveInterval = null;
+        let currentDirection = null;
+        let joystickActive = false;
         
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const ws = new WebSocket(`${protocol}//${window.location.host}/ws/mobile`);
@@ -373,7 +484,18 @@ async def root():
         };
         
         function move(direction) {
-            ws.send(JSON.stringify({ type: 'move', direction: direction, speed: 200 }));
+            const speed = Math.floor((currentSpeed / 100) * 255);
+            ws.send(JSON.stringify({ type: 'move', direction: direction, speed: speed }));
+        }
+        
+        function startMove(direction) {
+            currentDirection = direction;
+            move(direction);
+        }
+        
+        function stopMove() {
+            currentDirection = null;
+            move('stop');
         }
         
         function setEmotion(emotion) {
@@ -395,6 +517,148 @@ async def root():
                 document.getElementById('cameraView').innerHTML = '<div class="camera-placeholder">Camera Off</div>';
             }
         }
+        
+        function updateSpeed(value) {
+            currentSpeed = parseInt(value);
+            document.getElementById('speedValue').textContent = currentSpeed;
+        }
+        
+        function switchControlMode(mode) {
+            // Update tabs
+            const tabs = document.querySelectorAll('.mode-tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            // Find and activate the clicked tab
+            const clickedTab = Array.from(tabs).find(tab => 
+                (mode === 'buttons' && tab.textContent.includes('Button')) ||
+                (mode === 'joystick' && tab.textContent.includes('Joystick'))
+            );
+            if (clickedTab) clickedTab.classList.add('active');
+            
+            // Update content
+            const contents = document.querySelectorAll('.control-mode-content');
+            contents.forEach(content => content.classList.remove('active'));
+            
+            if (mode === 'buttons') {
+                document.getElementById('buttonMode').classList.add('active');
+            } else {
+                document.getElementById('joystickMode').classList.add('active');
+            }
+        }
+        
+        // Joystick functionality
+        const joystickContainer = document.getElementById('joystickContainer');
+        const joystickHandle = document.getElementById('joystickHandle');
+        let isDragging = false;
+        let centerX = 0;
+        let centerY = 0;
+        
+        function initJoystick() {
+            const rect = joystickContainer.getBoundingClientRect();
+            centerX = rect.width / 2;
+            centerY = rect.height / 2;
+            joystickHandle.style.left = `${centerX - 40}px`;
+            joystickHandle.style.top = `${centerY - 40}px`;
+        }
+        
+        setTimeout(initJoystick, 100);
+        
+        function handleJoystickStart(e) {
+            isDragging = true;
+            e.preventDefault();
+        }
+        
+        function handleJoystickMove(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            
+            const rect = joystickContainer.getBoundingClientRect();
+            let clientX, clientY;
+            
+            if (e.type.includes('touch')) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            
+            let x = clientX - rect.left - centerX;
+            let y = clientY - rect.top - centerY;
+            
+            // Limit to circle
+            const distance = Math.sqrt(x * x + y * y);
+            const maxDistance = 60;
+            
+            if (distance > maxDistance) {
+                x = (x / distance) * maxDistance;
+                y = (y / distance) * maxDistance;
+            }
+            
+            joystickHandle.style.left = `${centerX + x - 40}px`;
+            joystickHandle.style.top = `${centerY + y - 40}px`;
+            
+            // Determine direction
+            const angle = Math.atan2(y, x) * (180 / Math.PI);
+            let direction = 'stop';
+            
+            if (distance > 10) {
+                if (angle >= -45 && angle < 45) direction = 'right';
+                else if (angle >= 45 && angle < 135) direction = 'backward';
+                else if (angle >= -135 && angle < -45) direction = 'forward';
+                else direction = 'left';
+            }
+            
+            if (direction !== currentDirection) {
+                currentDirection = direction;
+                move(direction);
+            }
+        }
+        
+        function handleJoystickEnd(e) {
+            isDragging = false;
+            e.preventDefault();
+            
+            // Return to center
+            joystickHandle.style.left = `${centerX - 40}px`;
+            joystickHandle.style.top = `${centerY - 40}px`;
+            
+            currentDirection = 'stop';
+            move('stop');
+        }
+        
+        joystickHandle.addEventListener('mousedown', handleJoystickStart);
+        joystickHandle.addEventListener('touchstart', handleJoystickStart);
+        document.addEventListener('mousemove', handleJoystickMove);
+        document.addEventListener('touchmove', handleJoystickMove);
+        document.addEventListener('mouseup', handleJoystickEnd);
+        document.addEventListener('touchend', handleJoystickEnd);
+        
+        // WASD keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            
+            let direction = null;
+            switch(e.key.toLowerCase()) {
+                case 'w': direction = 'forward'; break;
+                case 'a': direction = 'left'; break;
+                case 's': direction = 'backward'; break;
+                case 'd': direction = 'right'; break;
+            }
+            
+            if (direction && direction !== currentDirection) {
+                currentDirection = direction;
+                move(direction);
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            if (['w', 'a', 's', 'd'].includes(key)) {
+                currentDirection = null;
+                move('stop');
+            }
+        });
     </script>
 </body>
 </html>

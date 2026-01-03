@@ -25,3 +25,8 @@ aiofiles==23.2.1
 
 # Async HTTP client support (Python 3.7+)
 aiohttp==3.9.1
+
+# Computer vision and ML for emotion detection
+opencv-python==4.8.1.78
+tensorflow==2.15.0
+numpy==1.24.3

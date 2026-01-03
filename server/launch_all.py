@@ -88,6 +88,24 @@ class RobotLauncher:
         print("✓ Mobile web server started on http://localhost:3000\n")
         return process
     
+    def start_emotion_detection_server(self):
+        """Start the emotion detection server (port 9999)"""
+        print("😊 Starting Emotion Detection Server (Port 9999)...")
+        server_dir = self.base_dir / "server"
+        process = subprocess.Popen(
+            [sys.executable, "emotion_detection_server.py"],
+            cwd=server_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            bufsize=1
+        )
+        self.processes.append(("Emotion Detection (9999)", process))
+        
+        time.sleep(2)
+        print("✓ Emotion detection server started on http://localhost:9999\n")
+        return process
+    
     def start_raspberry_pi_sim(self):
         """Start Raspberry Pi controller in simulation mode"""
         print("🤖 Starting Raspberry Pi Controller (Simulation Mode)...")
@@ -151,6 +169,7 @@ class RobotLauncher:
         print("   - Primary Control:    http://localhost:8000")
         print("   - Emotion Display:    http://localhost:10000")
         print("   - Mobile Interface:   http://localhost:3000")
+        print("   - Emotion Detection:  http://localhost:9999")
         print("\n📱 Mobile app: Configure server IP to this machine's IP address")
         print("\n⌨️  Press Ctrl+C to stop all components\n")
         print("=" * 70)
@@ -182,11 +201,13 @@ class RobotLauncher:
             self.start_server()
             self.start_emotion_display_server()
             self.start_mobile_web_server()
+            self.start_emotion_detection_server()
         elif mode == "full":
             # All components including hardware
             self.start_server()
             self.start_emotion_display_server()
             self.start_mobile_web_server()
+            self.start_emotion_detection_server()
             self.start_raspberry_pi_sim()
             self.start_ros_bridge()
         elif mode == "server+pi":
@@ -194,6 +215,7 @@ class RobotLauncher:
             self.start_server()
             self.start_emotion_display_server()
             self.start_mobile_web_server()
+            self.start_emotion_detection_server()
             self.start_raspberry_pi_sim()
         elif mode == "server-only":
             # Just primary server (legacy mode)
@@ -222,6 +244,7 @@ Port Setup:
   - Port 8000: Primary control (movement, camera, AI)
   - Port 10000: Emotion display (animated face)
   - Port 3000: Mobile web interface
+  - Port 9999: Emotion detection (facial expression analysis)
   
 For production:
   - Run this launcher on your main computer

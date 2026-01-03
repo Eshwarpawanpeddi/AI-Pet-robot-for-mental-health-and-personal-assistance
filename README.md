@@ -4,22 +4,27 @@ An empathetic AI-powered companion robot designed specifically for **mental heal
 
 ## 🎉 Latest Updates (January 2026)
 
-### 🆕 Multi-Port Architecture (v2.0)
+### 🆕 Multi-Port Architecture (v2.1) - NEW FEATURES!
 - **Port 8000**: Primary control server (movement, camera, AI, ROS)
 - **Port 10000**: Dedicated emotion display server (animated face)
-- **Port 3000**: Mobile-friendly web control interface
+- **Port 3000**: ✨ Enhanced mobile web interface with joystick, WASD controls, and speed adjustment
+- **Port 9999**: 😊 **NEW** - Real-time facial emotion detection with AI analysis
 - **Emotion Synchronization**: Automatic sync across all ports
 - **Flexible Deployment**: Run servers independently or together
 
-### New Features Added:
+### ✨ Latest Features Added:
+- 🎮 **Enhanced Port 3000 Controls**: Joystick mode, WASD keyboard controls, speed slider, larger camera view
+- 😊 **Emotion Detection (Port 9999)**: Real-time facial expression analysis using emotion_model.h5
+- 🔊 **Speaker Support**: Complete guide for 40mm 8Ω speaker setup with multiple connection options
+- 📖 **ROS Setup Guide**: Comprehensive documentation for autonomous navigation
+- 🧠 **Gemini-1.5-Flash**: Using cost-effective model for faster, cheaper AI responses
 - 🎥 **Live Camera Streaming**: Real-time video feed from Raspberry Pi to web and mobile interfaces
-- 🔊 **Text-to-Speech**: Robot speaks responses on Raspberry Pi using espeak
 - 🤖 **ROS Integration**: Full autonomous navigation mode with ROS bridge
 - 🧠 **Advanced Mental Health Monitoring**: Real-time emotion tracking with crisis detection
 - 🎨 **Enhanced UI**: Split-panel interface with animated emotions and camera view
 - 📱 **Mobile App Enhancements**: Camera view, control mode toggle, improved connectivity
 
-**See [SETUP_GUIDE.md](SETUP_GUIDE.md) for complete setup instructions.**
+**See [FEATURES_GUIDE.md](FEATURES_GUIDE.md) for new features or [SETUP_GUIDE.md](SETUP_GUIDE.md) for setup instructions.**
 
 ## 🧠 Mental Health Focus
 
@@ -133,7 +138,8 @@ The system uses **three separate servers** for different purposes:
 |------|---------|----------|
 | **8000** | Primary Control | Movement, camera, AI, ROS, mental health |
 | **10000** | Emotion Display | Dedicated animated face, auto-sync |
-| **3000** | Mobile Web | Touch-optimized controls, lightweight |
+| **3000** | Mobile Web | ✨ Touch controls, joystick, WASD, speed adjustment |
+| **9999** | Emotion Detection | 😊 Facial expression analysis, AI responses |
 
 ## 📋 Prerequisites
 
@@ -605,6 +611,9 @@ controller.stop()
 
 ## 📚 Additional Documentation
 
+- **[FEATURES_GUIDE.md](FEATURES_GUIDE.md)** - 🆕 **Complete guide to new features (Port 3000, Emotion Detection, etc.)**
+- **[ROS_SETUP_GUIDE.md](ROS_SETUP_GUIDE.md)** - 🆕 **Complete ROS installation and usage guide**
+- **[SPEAKER_SETUP_GUIDE.md](SPEAKER_SETUP_GUIDE.md)** - 🆕 **Hardware guide for 40mm 8Ω speaker**
 - **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - 🆕 **Complete setup guide for multi-port architecture**
 - **[Integration Update](INTEGRATION_UPDATE.md)** - Latest features: Camera, Speech, ROS, Mental Health Monitoring
 - **[Mental Health Features](MENTAL_HEALTH_FEATURES.md)** - Comprehensive mental health support documentation
