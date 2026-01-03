@@ -106,7 +106,7 @@ async def lifespan(app: FastAPI):
             
             # Implement exponential backoff for failures
             if consecutive_failures > 0:
-                retry_delay = min(retry_delay * 1.5, max_retry_delay)
+                retry_delay = min(retry_delay * 2, max_retry_delay)
                 logger.debug(f"Using retry delay of {retry_delay:.1f}s after {consecutive_failures} failures")
             
             await asyncio.sleep(retry_delay)
@@ -348,6 +348,7 @@ async def websocket_emotion_display(websocket: WebSocket):
             await websocket.receive_text()
     except asyncio.CancelledError:
         logger.info("WebSocket connection cancelled")
+        raise  # Re-raise to allow proper task cancellation
     except Exception as e:
         logger.debug(f"WebSocket disconnected: {e}")
     finally:
