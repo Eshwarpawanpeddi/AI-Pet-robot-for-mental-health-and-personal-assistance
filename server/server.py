@@ -28,6 +28,7 @@ class RobotState:
         self.is_speaking = False
         self.battery_level = 100
         self.connected_clients = []
+        self.emotion_display_clients = []  # Clients connected to emotion display
         self.raspberry_pi_client = None
         self.ros_client = None  # ROS bridge client
         self.gemini_session = None
@@ -195,6 +196,37 @@ async def websocket_ros(websocket: WebSocket):
         robot_state.ros_client = None
         logger.info("ROS bridge disconnected")
 
+@app.websocket("/ws/emotion_display")
+async def websocket_emotion_display(websocket: WebSocket):
+    """WebSocket endpoint for emotion display clients on port 8000"""
+    await websocket.accept()
+    robot_state.emotion_display_clients.append(websocket)
+    logger.info(f"Emotion display client connected. Total: {len(robot_state.emotion_display_clients)}")
+    
+    # Send current emotion immediately
+    try:
+        await websocket.send_json({
+            'type': 'emotion_update',
+            'emotion': robot_state.emotion
+        })
+    except Exception as e:
+        logger.error(f"Failed to send initial emotion to client: {e}")
+    
+    try:
+        while True:
+            # Keep connection alive and listen for any messages
+            await websocket.receive_text()
+    except asyncio.CancelledError:
+        logger.info("WebSocket connection cancelled")
+        raise
+    except Exception as e:
+        logger.debug(f"WebSocket disconnected: {e}")
+    finally:
+        # Ensure proper cleanup
+        if websocket in robot_state.emotion_display_clients:
+            robot_state.emotion_display_clients.remove(websocket)
+        logger.info(f"Emotion display client disconnected. Total: {len(robot_state.emotion_display_clients)}")
+
 async def start_camera():
     """Start camera streaming from Raspberry Pi"""
     if robot_state.raspberry_pi_client:
@@ -258,10 +290,27 @@ async def handle_text_command(data: Dict):
     await broadcast_state()
 
 async def sync_emotion_to_display(emotion: str):
-    """Synchronize emotion to both Raspberry Pi and emotion display server (port 10000)"""
+    """Synchronize emotion to Raspberry Pi, local emotion display clients, and emotion display server (port 10000)"""
     # Send to Raspberry Pi
     if robot_state.raspberry_pi_client:
         await robot_state.raspberry_pi_client.send_json({"type": "emotion", "emotion": emotion})
+    
+    # Broadcast to local emotion display clients (port 8000)
+    disconnected_clients = []
+    for client in robot_state.emotion_display_clients:
+        try:
+            await client.send_json({
+                'type': 'emotion_update',
+                'emotion': emotion
+            })
+        except Exception as e:
+            logger.error(f"Failed to send to emotion display client: {e}")
+            disconnected_clients.append(client)
+    
+    # Clean up disconnected clients
+    for client in disconnected_clients:
+        if client in robot_state.emotion_display_clients:
+            robot_state.emotion_display_clients.remove(client)
     
     # Send to emotion display server (port 10000)
     try:
@@ -344,6 +393,16 @@ async def broadcast_state():
 
 @app.get("/")
 async def root():
+    """Serve the emotion display page (emotion-only, no controls)"""
+    emotion_display_path = os.path.join(frontend_dir, "emotion_display.html")
+    if os.path.exists(emotion_display_path):
+        return FileResponse(emotion_display_path)
+    # Fallback to face_display.html if emotion_display.html doesn't exist
+    return FileResponse(os.path.join(frontend_dir, "face_display.html"))
+
+@app.get("/control")
+async def control_panel():
+    """Serve the full control panel with camera, audio controls, etc."""
     return FileResponse(os.path.join(frontend_dir, "face_display.html"))
 
 @app.get("/health")

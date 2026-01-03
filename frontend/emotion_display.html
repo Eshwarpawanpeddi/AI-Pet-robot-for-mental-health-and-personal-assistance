@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Emotion Display</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #faceCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .connection-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .connection-indicator.connected {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            border: 2px solid #10b981;
+        }
+
+        .connection-indicator.disconnected {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 2px solid #ef4444;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .emotion-label {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 30px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 30px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-transform: capitalize;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="faceCanvas"></canvas>
+    <div class="connection-indicator disconnected" id="connectionStatus">Connecting...</div>
+    <div class="emotion-label" id="emotionLabel">Neutral</div>
+
+    <script>
+        class ExpressiveEyesRenderer {
+            constructor(canvasId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.emotion = 'neutral';
+                this.eyeOpen = 1.0;
+                this.time = 0;
+                this.tears = [];
+                this.angerShake = 0;
+                this.angerIntensity = 0;
+                this.happyParticles = [];
+                this.neutralPulse = 0;
+                
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                this.animate();
+            }
+
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+                this.centerX = this.canvas.width / 2;
+                this.centerY = this.canvas.height / 2;
+            }
+
+            animate() {
+                this.time += 0.05;
+                
+                // Blinking animation
+                this.eyeOpen = (this.time % 5 < 0.15) ? 0.1 : 1.0;
+                
+                // Emotion-specific animations
+                if (this.emotion === 'angry') {
+                    this.angerShake = Math.sin(this.time * 3) * 5;
+                    this.angerIntensity = Math.abs(Math.sin(this.time * 2)) * 0.5 + 0.5;
+                } else if (this.emotion === 'happy') {
+                    // Create sparkle particles
+                    if (Math.random() > 0.85) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const distance = 80 + Math.random() * 100;
+                        this.happyParticles.push({
+                            x: this.centerX + Math.cos(angle) * distance,
+                            y: this.centerY + Math.sin(angle) * distance,
+                            vx: (Math.random() - 0.5) * 2,
+                            vy: (Math.random() - 0.5) * 2,
+                            life: 1.0,
+                            size: 3 + Math.random() * 4,
+                            rotation: Math.random() * Math.PI * 2
+                        });
+                    }
+                    // Update particles
+                    this.happyParticles = this.happyParticles.filter(p => {
+                        p.x += p.vx;
+                        p.y += p.vy;
+                        p.life -= 0.015;
+                        p.rotation += 0.1;
+                        return p.life > 0;
+                    });
+                } else if (this.emotion === 'neutral') {
+                    // Gentle breathing pulse
+                    this.neutralPulse = Math.sin(this.time * 0.5) * 0.05 + 1.0;
+                }
+                
+                this.draw();
+                requestAnimationFrame(() => this.animate());
+            }
+
+            draw() {
+                // Clear canvas
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                const color = this.getEmotionColor();
+                
+                // Draw emotion-specific effects
+                if (this.emotion === 'sad') {
+                    this.drawTears();
+                } else if (this.emotion === 'angry') {
+                    this.drawAngerEffects();
+                } else if (this.emotion === 'happy') {
+                    this.drawHappyEffects();
+                } else if (this.emotion === 'neutral') {
+                    this.drawNeutralEffects();
+                }
+
+                // Draw eyes
+                const eyeSpacing = this.canvas.width * 0.16;
+                const shakeX = this.emotion === 'angry' ? this.angerShake : 0;
+                this.drawEye(this.centerX - eyeSpacing + shakeX, this.centerY, color, 'L');
+                this.drawEye(this.centerX + eyeSpacing + shakeX, this.centerY, color, 'R');
+            }
+
+            drawHappyEffects() {
+                // Draw sparkle particles
+                this.ctx.save();
+                this.happyParticles.forEach(p => {
+                    this.ctx.save();
+                    this.ctx.translate(p.x, p.y);
+                    this.ctx.rotate(p.rotation);
+                    this.ctx.globalAlpha = p.life;
+                    
+                    // Draw star shape
+                    this.ctx.fillStyle = '#FFD700';
+                    this.ctx.shadowBlur = 10;
+                    this.ctx.shadowColor = '#FFD700';
+                    
+                    this.ctx.beginPath();
+                    for (let i = 0; i < 5; i++) {
+                        const angle = (i * 4 * Math.PI) / 5;
+                        const x = Math.cos(angle) * p.size;
+                        const y = Math.sin(angle) * p.size;
+                        if (i === 0) {
+                            this.ctx.moveTo(x, y);
+                        } else {
+                            this.ctx.lineTo(x, y);
+                        }
+                    }
+                    this.ctx.closePath();
+                    this.ctx.fill();
+                    
+                    this.ctx.restore();
+                });
+                this.ctx.restore();
+                
+                // Add gentle glow around the face
+                const glowIntensity = Math.sin(this.time * 2) * 0.1 + 0.15;
+                this.ctx.save();
+                this.ctx.globalAlpha = glowIntensity;
+                this.ctx.fillStyle = '#FFD700';
+                this.ctx.shadowBlur = 100;
+                this.ctx.shadowColor = '#FFD700';
+                this.ctx.beginPath();
+                this.ctx.arc(this.centerX, this.centerY, 200, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.restore();
+            }
+
+            drawNeutralEffects() {
+                // Gentle breathing glow
+                const glowIntensity = Math.sin(this.time * 0.5) * 0.05 + 0.08;
+                this.ctx.save();
+                this.ctx.globalAlpha = glowIntensity;
+                this.ctx.fillStyle = '#4ADE80';
+                this.ctx.shadowBlur = 80;
+                this.ctx.shadowColor = '#4ADE80';
+                this.ctx.beginPath();
+                this.ctx.arc(this.centerX, this.centerY, 180, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.restore();
+                
+                // Draw floating subtle particles
+                const numParticles = 5;
+                for (let i = 0; i < numParticles; i++) {
+                    const angle = (this.time * 0.3 + i * Math.PI * 2 / numParticles) % (Math.PI * 2);
+                    const distance = 150 + Math.sin(this.time * 0.5 + i) * 30;
+                    const x = this.centerX + Math.cos(angle) * distance;
+                    const y = this.centerY + Math.sin(angle) * distance;
+                    const alpha = Math.sin(this.time * 0.5 + i * 1.5) * 0.2 + 0.3;
+                    
+                    this.ctx.save();
+                    this.ctx.globalAlpha = alpha;
+                    this.ctx.fillStyle = '#4ADE80';
+                    this.ctx.shadowBlur = 15;
+                    this.ctx.shadowColor = '#4ADE80';
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, 3, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.restore();
+                }
+            }
+            
+            drawAngerEffects() {
+                // Pulsing red background effect
+                const alpha = this.angerIntensity * 0.2;
+                this.ctx.fillStyle = `rgba(255, 80, 80, ${alpha})`;
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Anger lines/sparks
+                this.ctx.strokeStyle = `rgba(255, 100, 100, ${this.angerIntensity})`;
+                this.ctx.lineWidth = 3;
+                for (let i = 0; i < 3; i++) {
+                    const angle = (this.time * 2 + i * Math.PI * 2 / 3) % (Math.PI * 2);
+                    const x = this.centerX + Math.cos(angle) * 150;
+                    const y = this.centerY + Math.sin(angle) * 100;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, y);
+                    this.ctx.lineTo(x + Math.cos(angle) * 30, y + Math.sin(angle) * 30);
+                    this.ctx.stroke();
+                }
+            }
+
+            drawTears() {
+                const eyeSpacing = this.canvas.width * 0.16;
+                if (Math.random() > 0.92) {
+                    this.tears.push({
+                        x: (this.centerX - eyeSpacing) + (Math.random() * 30 - 15),
+                        y: this.centerY + 20,
+                        speed: Math.random() * 2 + 2
+                    });
+                    this.tears.push({
+                        x: (this.centerX + eyeSpacing) + (Math.random() * 30 - 15),
+                        y: this.centerY + 20,
+                        speed: Math.random() * 2 + 2
+                    });
+                }
+
+                this.ctx.fillStyle = 'rgba(74, 144, 226, 0.7)';
+                this.ctx.shadowBlur = 5;
+                this.ctx.shadowColor = 'rgba(74, 144, 226, 0.5)';
+                for (let i = 0; i < this.tears.length; i++) {
+                    let t = this.tears[i];
+                    t.y += t.speed;
+                    this.ctx.beginPath();
+                    this.ctx.arc(t.x, t.y, 4, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    
+                    if (t.y > this.canvas.height) {
+                        this.tears.splice(i, 1);
+                        i--;
+                    }
+                }
+                this.ctx.shadowBlur = 0;
+            }
+
+            drawEye(x, y, color, side) {
+                this.ctx.save();
+                this.ctx.translate(x, y);
+                
+                // Apply neutral pulse scaling
+                if (this.emotion === 'neutral') {
+                    this.ctx.scale(this.neutralPulse, this.neutralPulse);
+                }
+                
+                this.ctx.fillStyle = color;
+                this.ctx.shadowBlur = 20;
+                this.ctx.shadowColor = color;
+
+                const baseSize = this.canvas.height * 0.12;
+
+                if (this.emotion === 'happy') {
+                    // Upward curved eyes (smile eyes)
+                    this.ctx.lineWidth = baseSize * 0.25;
+                    this.ctx.strokeStyle = color;
+                    this.ctx.lineCap = 'round';
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, baseSize * 0.2, baseSize * 0.6, Math.PI, 0, false);
+                    this.ctx.stroke();
+                } else if (this.emotion === 'angry') {
+                    // Angled eyebrows + narrowed eyes
+                    this.ctx.strokeStyle = color;
+                    this.ctx.lineWidth = baseSize * 0.2;
+                    this.ctx.lineCap = 'round';
+                    this.ctx.beginPath();
+                    if (side === 'L') {
+                        this.ctx.moveTo(-baseSize, -baseSize);
+                        this.ctx.lineTo(baseSize * 0.5, -baseSize * 0.4);
+                    } else {
+                        this.ctx.moveTo(baseSize, -baseSize);
+                        this.ctx.lineTo(-baseSize * 0.5, -baseSize * 0.4);
+                    }
+                    this.ctx.stroke();
+                    this.drawPill(baseSize * 0.9, baseSize * 1.5);
+                } else if (this.emotion === 'sad') {
+                    // Drooping eyes
+                    this.ctx.rotate(side === 'L' ? -0.25 : 0.25);
+                    this.drawPill(baseSize * 0.8, baseSize * 1.1 * this.eyeOpen);
+                } else {
+                    // Neutral eyes
+                    this.drawPill(baseSize * 0.9, baseSize * 1.5 * this.eyeOpen);
+                }
+                this.ctx.restore();
+            }
+
+            drawPill(w, h) {
+                this.ctx.beginPath();
+                this.ctx.roundRect(-w / 2, -h / 2, w, h, w / 2);
+                this.ctx.fill();
+            }
+
+            getEmotionColor() {
+                const colors = {
+                    'happy': '#FFD700',
+                    'sad': '#4A90E2',
+                    'angry': '#FF5050',
+                    'neutral': '#4ADE80'
+                };
+                return colors[this.emotion] || colors['neutral'];
+            }
+
+            setEmotion(emotion) {
+                this.emotion = emotion;
+                // Update emotion label
+                document.getElementById('emotionLabel').textContent = emotion.charAt(0).toUpperCase() + emotion.slice(1);
+                console.log('Emotion updated to:', emotion);
+            }
+        }
+
+        // Initialize the emotion display
+        const eyes = new ExpressiveEyesRenderer('faceCanvas');
+        
+        // WebSocket connection to server
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}/ws/emotion_display`);
+        
+        const connectionStatus = document.getElementById('connectionStatus');
+        
+        ws.onopen = () => {
+            console.log('Connected to emotion display server');
+            connectionStatus.textContent = '✓ Connected';
+            connectionStatus.className = 'connection-indicator connected';
+        };
+        
+        ws.onclose = () => {
+            console.log('Disconnected from emotion display server');
+            connectionStatus.textContent = '✗ Disconnected';
+            connectionStatus.className = 'connection-indicator disconnected';
+            
+            // Attempt to reconnect after 3 seconds
+            setTimeout(() => {
+                location.reload();
+            }, 3000);
+        };
+        
+        ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            connectionStatus.textContent = '✗ Connection Error';
+            connectionStatus.className = 'connection-indicator disconnected';
+        };
+        
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'emotion_update') {
+                    eyes.setEmotion(data.emotion);
+                }
+            } catch (error) {
+                console.error('Error parsing message:', error);
+            }
+        };
+    </script>
+</body>
+</html>
