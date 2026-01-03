@@ -298,7 +298,7 @@ The ROS bridge connects to port 8000 at `/ws/ros` and enables:
    - Complete status display
 
 #### Emotion Display (Port 10000)
-1. Open browser: `http://localhost:1000`
+1. Open browser: `http://localhost:10000`
 2. Best on separate monitor/screen
 3. Shows animated robot face
 4. Automatically syncs emotions from primary server
@@ -581,7 +581,7 @@ sudo systemctl start robot-primary robot-emotion robot-mobile
 
 Create your own emotion display by connecting to port 10000's WebSocket:
 ```javascript
-const ws = new WebSocket('ws://localhost:1000/ws/emotion_display');
+const ws = new WebSocket('ws://localhost:10000/ws/emotion_display');
 ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
     if (data.type === 'emotion_update') {
