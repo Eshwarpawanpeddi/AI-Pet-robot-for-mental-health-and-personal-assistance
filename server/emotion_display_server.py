@@ -141,15 +141,16 @@ if os.path.exists(frontend_dir):
 @app.get("/")
 async def root():
     """Serve the emotion display page"""
-    # Check if static file exists
-    emotion_display_path = os.path.join(frontend_dir, "emotion_display.html")
-    if os.path.exists(emotion_display_path):
-        logger.debug(f"Serving emotion display from: {emotion_display_path}")
-        return FileResponse(emotion_display_path)
-    else:
-        # Return a simple inline version as fallback
-        logger.info("emotion_display.html not found, serving inline fallback")
-        return HTMLResponse(content="""
+    # Check if static file exists (try both possible names)
+    for filename in ["emotion_display.html", "face_display.html"]:
+        file_path = os.path.join(frontend_dir, filename)
+        if os.path.exists(file_path):
+            logger.debug(f"Serving emotion display from: {file_path}")
+            return FileResponse(file_path)
+    
+    # Return a simple inline version as fallback
+    logger.info("emotion_display.html not found, serving inline fallback")
+    return HTMLResponse(content="""
 <!DOCTYPE html>
 <html>
 <head>
