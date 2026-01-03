@@ -17,7 +17,7 @@ This robot system uses **three separate servers** running on different ports for
 
 **Access:** `http://localhost:8000`
 
-### Port 1000 - Emotion Display Server
+### Port 10000 - Emotion Display Server
 **Purpose:** Dedicated animated emotion/face display
 **Features:**
 - Full-screen animated robot face
@@ -47,7 +47,7 @@ This robot system uses **three separate servers** running on different ports for
 │           Mobile/Web Clients                     │
 │  - Desktop Browser → Port 8000                   │
 │  - Mobile Browser  → Port 3000                   │
-│  - Display Screen  → Port 1000                   │
+│  - Display Screen  → Port 10000                   │
 └──────────────────┬──────────────────────────────┘
                    │
                    ▼
@@ -62,7 +62,7 @@ This robot system uses **three separate servers** running on different ports for
 │  └──────────┬──────────────┬────────────────┘   │
 │             │              │                     │
 │  ┌──────────▼─────────┐  ┌▼─────────────────┐   │
-│  │ Port 1000:         │  │ Port 3000:       │   │
+│  │ Port 10000:         │  │ Port 3000:       │   │
 │  │ Emotion Display    │  │ Mobile Web       │   │
 │  │ - Polls 8000       │  │ - Forwards to    │   │
 │  │ - POST /api/emotion│  │   port 8000      │   │
@@ -150,7 +150,7 @@ python launch_all.py
 
 This starts:
 - Port 8000: Primary control
-- Port 1000: Emotion display
+- Port 10000: Emotion display
 - Port 3000: Mobile web interface
 
 **Option B: Start Servers Individually**
@@ -297,7 +297,7 @@ The ROS bridge connects to port 8000 at `/ws/ros` and enables:
    - Mode switching (manual/autonomous)
    - Complete status display
 
-#### Emotion Display (Port 1000)
+#### Emotion Display (Port 10000)
 1. Open browser: `http://localhost:1000`
 2. Best on separate monitor/screen
 3. Shows animated robot face
@@ -314,7 +314,7 @@ The ROS bridge connects to port 8000 at `/ws/ros` and enables:
 
 **Recommended Setup:**
 - **Main Monitor:** Primary control (port 8000)
-- **Second Monitor:** Emotion display (port 1000) - Full screen
+- **Second Monitor:** Emotion display (port 10000) - Full screen
 - **Smartphone:** Mobile interface (port 3000)
 
 ### Emotion Synchronization
@@ -327,7 +327,7 @@ Emotions automatically sync across all servers:
    ws.send(JSON.stringify({type: 'emotion', emotion: 'happy'}));
    ```
 
-2. **Emotion display (port 1000) automatically updates**
+2. **Emotion display (port 10000) automatically updates**
    - Polls port 8000 every second
    - Also accepts direct POST requests
    
@@ -404,7 +404,7 @@ Or use the mode toggle buttons in the web interface.
 - `POST /api/speak` - Make robot speak
 - `GET /api/mental_health/insights` - Mental health data
 
-### Emotion Display Server (Port 1000)
+### Emotion Display Server (Port 10000)
 
 #### WebSocket Endpoints
 
@@ -579,7 +579,7 @@ sudo systemctl start robot-primary robot-emotion robot-mobile
 
 ### Custom Emotion Display
 
-Create your own emotion display by connecting to port 1000's WebSocket:
+Create your own emotion display by connecting to port 10000's WebSocket:
 ```javascript
 const ws = new WebSocket('ws://localhost:1000/ws/emotion_display');
 ws.onmessage = (event) => {

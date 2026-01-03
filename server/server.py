@@ -258,16 +258,16 @@ async def handle_text_command(data: Dict):
     await broadcast_state()
 
 async def sync_emotion_to_display(emotion: str):
-    """Synchronize emotion to both Raspberry Pi and emotion display server (port 1000)"""
+    """Synchronize emotion to both Raspberry Pi and emotion display server (port 10000)"""
     # Send to Raspberry Pi
     if robot_state.raspberry_pi_client:
         await robot_state.raspberry_pi_client.send_json({"type": "emotion", "emotion": emotion})
     
-    # Send to emotion display server (port 1000)
+    # Send to emotion display server (port 10000)
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                'http://localhost:1000/api/emotion',
+                'http://localhost:10000/api/emotion',
                 json={'emotion': emotion},
                 timeout=aiohttp.ClientTimeout(total=1)
             ) as resp:

@@ -42,7 +42,7 @@ class RobotState:
         self.mental_health_insights = []
         self.concern_level = 0  # 0-10 scale
         
-        # Emotion display subscribers (for port 1000)
+        # Emotion display subscribers (for port 10000)
         self.emotion_display_clients = []
         
         # Lock for thread-safe access (will be initialized in async context)

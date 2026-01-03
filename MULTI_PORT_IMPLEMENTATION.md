@@ -24,9 +24,9 @@ Successfully refactored the AI Pet Robot system from a single-port monolithic se
 - Web control clients connect here
 - Raspberry Pi hardware connects here
 - ROS bridge connects here
-- Syncs emotions to port 1000 via HTTP POST
+- Syncs emotions to port 10000 via HTTP POST
 
-### Port 1000 - Emotion Display Server
+### Port 10000 - Emotion Display Server
 **File:** `server/emotion_display_server.py`
 
 **Purpose:** Dedicated animated emotion/face display
@@ -95,7 +95,7 @@ Successfully refactored the AI Pet Robot system from a single-port monolithic se
 
 1. **`server/server.py`**
    - Added `aiohttp` import for HTTP POST requests
-   - Updated `sync_emotion_to_display()` to send POST to port 1000
+   - Updated `sync_emotion_to_display()` to send POST to port 10000
    - No other changes to existing functionality
 
 2. **`server/launch_all.py`**
@@ -122,10 +122,10 @@ Successfully refactored the AI Pet Robot system from a single-port monolithic se
 When emotion changes on port 8000:
 ```python
 async def sync_emotion_to_display(emotion: str):
-    # Send to port 1000
+    # Send to port 10000
     async with aiohttp.ClientSession() as session:
         async with session.post(
-            'http://localhost:1000/api/emotion',
+            'http://localhost:10000/api/emotion',
             json={'emotion': emotion},
             timeout=aiohttp.ClientTimeout(total=1)
         ) as resp:
@@ -133,7 +133,7 @@ async def sync_emotion_to_display(emotion: str):
 ```
 
 ### Method 2: Polling (Display → Primary)
-Port 1000 polls port 8000 every second:
+Port 10000 polls port 8000 every second:
 ```python
 async def poll_primary_server():
     while True:
@@ -207,7 +207,7 @@ Starts servers plus hardware simulation.
 
 ### Server Startup Tests
 ✅ Port 8000 (Primary) - Starts successfully  
-✅ Port 1000 (Emotion Display) - Starts successfully  
+✅ Port 10000 (Emotion Display) - Starts successfully  
 ✅ Port 3000 (Mobile Web) - Starts successfully  
 
 ### Code Quality
@@ -226,7 +226,7 @@ Starts servers plus hardware simulation.
 
 For existing users:
 1. **No breaking changes** - Port 8000 works exactly as before
-2. Optionally enable port 1000 for dedicated emotion display
+2. Optionally enable port 10000 for dedicated emotion display
 3. Optionally enable port 3000 for mobile access
 4. Use `launch_all.py` to start all servers together
 5. Use `--server-only` flag for legacy single-server mode
