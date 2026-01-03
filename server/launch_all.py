@@ -4,7 +4,7 @@ AI Pet Robot - Integrated Launcher
 Starts all components in the correct order with proper monitoring.
 Now supports multi-port setup:
 - Port 8000: Primary control server
-- Port 1000: Emotion display server
+- Port 10000: Emotion display server
 - Port 3000: Mobile web interface
 """
 
@@ -53,8 +53,8 @@ class RobotLauncher:
         return process
     
     def start_emotion_display_server(self):
-        """Start the emotion display server (port 1000)"""
-        print("🎨 Starting Emotion Display Server (Port 1000)...")
+        """Start the emotion display server (port 10000)"""
+        print("🎨 Starting Emotion Display Server (Port 10000)...")
         server_dir = self.base_dir / "server"
         process = subprocess.Popen(
             [sys.executable, "emotion_display_server.py"],
@@ -64,10 +64,10 @@ class RobotLauncher:
             universal_newlines=True,
             bufsize=1
         )
-        self.processes.append(("Emotion Display (1000)", process))
+        self.processes.append(("Emotion Display (10000)", process))
         
         time.sleep(2)
-        print("✓ Emotion display server started on http://localhost:1000\n")
+        print("✓ Emotion display server started on http://localhost:10000\n")
         return process
     
     def start_mobile_web_server(self):
@@ -149,7 +149,7 @@ class RobotLauncher:
             print(f"   ✓ {name}")
         print("\n🌐 Access points:")
         print("   - Primary Control:    http://localhost:8000")
-        print("   - Emotion Display:    http://localhost:1000")
+        print("   - Emotion Display:    http://localhost:10000")
         print("   - Mobile Interface:   http://localhost:3000")
         print("\n📱 Mobile app: Configure server IP to this machine's IP address")
         print("\n⌨️  Press Ctrl+C to stop all components\n")
@@ -220,7 +220,7 @@ Examples:
   
 Port Setup:
   - Port 8000: Primary control (movement, camera, AI)
-  - Port 1000: Emotion display (animated face)
+  - Port 10000: Emotion display (animated face)
   - Port 3000: Mobile web interface
   
 For production:

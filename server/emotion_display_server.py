@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Emotion Display Server - Port 1000
+Emotion Display Server - Port 10000
 Dedicated server for displaying robot emotions/animated face.
 Receives emotion updates from the primary control server (port 8000).
 """
@@ -15,7 +15,19 @@ import os
 import uvicorn
 import aiohttp
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure logging to file and console
+log_dir = os.path.join(os.path.dirname(__file__), 'logs')
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, 'emotion_display_server.log')
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_file),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
 class EmotionDisplayState:
@@ -31,7 +43,8 @@ class EmotionDisplayState:
     
     async def broadcast_emotion(self):
         """Broadcast current emotion to all display clients"""
-        for client in self.display_clients[:]:
+        disconnected_clients = []
+        for client in self.display_clients:
             try:
                 await client.send_json({
                     'type': 'emotion_update',
@@ -39,7 +52,13 @@ class EmotionDisplayState:
                 })
             except Exception as e:
                 logger.error(f"Failed to send to client: {e}")
+                disconnected_clients.append(client)
+        
+        # Clean up disconnected clients
+        for client in disconnected_clients:
+            if client in self.display_clients:
                 self.display_clients.remove(client)
+                logger.info(f"Removed disconnected client. Total clients: {len(self.display_clients)}")
 
 display_state = EmotionDisplayState()
 
@@ -50,22 +69,47 @@ async def lifespan(app: FastAPI):
     
     # Start background task to poll primary server for emotion updates
     async def poll_primary_server():
-        """Poll port 8000 for emotion state"""
+        """Poll port 8000 for emotion state with exponential backoff on errors"""
         await asyncio.sleep(5)  # Wait for server to be ready
+        
+        retry_delay = 1  # Start with 1 second delay
+        max_retry_delay = 30  # Maximum 30 seconds between retries
+        consecutive_failures = 0
         
         while True:
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get('http://localhost:8000/api/state') as resp:
+                    async with session.get(
+                        'http://localhost:8000/api/state',
+                        timeout=aiohttp.ClientTimeout(total=5)
+                    ) as resp:
                         if resp.status == 200:
                             data = await resp.json()
                             new_emotion = data.get('emotion', 'neutral')
                             if new_emotion != display_state.emotion:
                                 await display_state.set_emotion(new_emotion)
-            except Exception as e:
+                            # Reset retry delay on success
+                            retry_delay = 1
+                            consecutive_failures = 0
+                        else:
+                            logger.warning(f"Primary server returned status {resp.status}")
+                            consecutive_failures += 1
+            except asyncio.TimeoutError:
+                consecutive_failures += 1
+                logger.warning(f"Timeout connecting to primary server (attempt {consecutive_failures})")
+            except aiohttp.ClientError as e:
+                consecutive_failures += 1
                 logger.debug(f"Could not connect to primary server: {e}")
+            except Exception as e:
+                consecutive_failures += 1
+                logger.error(f"Unexpected error polling primary server: {e}")
             
-            await asyncio.sleep(1)  # Poll every second
+            # Implement exponential backoff for failures
+            if consecutive_failures > 0:
+                retry_delay = min(retry_delay * 2, max_retry_delay)
+                logger.debug(f"Using retry delay of {retry_delay:.1f}s after {consecutive_failures} failures")
+            
+            await asyncio.sleep(retry_delay)
     
     poll_task = asyncio.create_task(poll_primary_server())
     
@@ -79,7 +123,15 @@ async def lifespan(app: FastAPI):
         pass
 
 app = FastAPI(lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+# Configure CORS for production - allow all for emotion display
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for emotion display
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Mount static files
 frontend_dir = os.path.join(os.path.dirname(__file__), "../frontend")
@@ -89,12 +141,16 @@ if os.path.exists(frontend_dir):
 @app.get("/")
 async def root():
     """Serve the emotion display page"""
-    emotion_display_path = os.path.join(frontend_dir, "emotion_display.html")
-    if os.path.exists(emotion_display_path):
-        return FileResponse(emotion_display_path)
-    else:
-        # Return a simple inline version
-        return HTMLResponse(content="""
+    # Check if static file exists (try both possible names)
+    for filename in ["emotion_display.html", "face_display.html"]:
+        file_path = os.path.join(frontend_dir, filename)
+        if os.path.exists(file_path):
+            logger.debug(f"Serving emotion display from: {file_path}")
+            return FileResponse(file_path)
+    
+    # Return a simple inline version as fallback
+    logger.info("emotion_display.html not found, serving inline fallback")
+    return HTMLResponse(content="""
 <!DOCTYPE html>
 <html>
 <head>
@@ -273,7 +329,7 @@ async def root():
 
 @app.websocket("/ws/emotion_display")
 async def websocket_emotion_display(websocket: WebSocket):
-    """WebSocket for emotion display clients"""
+    """WebSocket for emotion display clients with proper disconnect handling"""
     await websocket.accept()
     display_state.display_clients.append(websocket)
     logger.info(f"Emotion display client connected. Total: {len(display_state.display_clients)}")
@@ -284,14 +340,20 @@ async def websocket_emotion_display(websocket: WebSocket):
             'type': 'emotion_update',
             'emotion': display_state.emotion
         })
-    except:
-        pass
+    except Exception as e:
+        logger.error(f"Failed to send initial emotion to client: {e}")
     
     try:
         while True:
             # Keep connection alive and listen for any messages
             await websocket.receive_text()
-    except:
+    except asyncio.CancelledError:
+        logger.info("WebSocket connection cancelled")
+        raise  # Re-raise to allow proper task cancellation
+    except Exception as e:
+        logger.debug(f"WebSocket disconnected: {e}")
+    finally:
+        # Ensure proper cleanup
         if websocket in display_state.display_clients:
             display_state.display_clients.remove(websocket)
         logger.info(f"Emotion display client disconnected. Total: {len(display_state.display_clients)}")
@@ -314,7 +376,7 @@ async def health_check():
     return {
         'status': 'healthy',
         'server': 'emotion_display',
-        'port': 1000,
+        'port': 10000,
         'emotion': display_state.emotion,
         'clients': len(display_state.display_clients)
     }
@@ -326,10 +388,11 @@ if __name__ == "__main__":
     logger.info("")
     logger.info("🎨 Server Configuration:")
     logger.info(f"   - Host: 0.0.0.0")
-    logger.info(f"   - Port: 1000")
+    logger.info(f"   - Port: 10000")
+    logger.info(f"   - Log File: {log_file}")
     logger.info("")
     logger.info("🌐 Access the emotion display at:")
-    logger.info("   - http://localhost:1000")
+    logger.info("   - http://localhost:10000")
     logger.info("")
     logger.info("📡 WebSocket Endpoint:")
     logger.info("   - /ws/emotion_display → Display clients")
@@ -341,4 +404,4 @@ if __name__ == "__main__":
     logger.info("=" * 60)
     logger.info("")
     
-    uvicorn.run(app, host="0.0.0.0", port=1000)
+    uvicorn.run(app, host="0.0.0.0", port=10000)

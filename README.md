@@ -6,7 +6,7 @@ An empathetic AI-powered companion robot designed specifically for **mental heal
 
 ### 🆕 Multi-Port Architecture (v2.0)
 - **Port 8000**: Primary control server (movement, camera, AI, ROS)
-- **Port 1000**: Dedicated emotion display server (animated face)
+- **Port 10000**: Dedicated emotion display server (animated face)
 - **Port 3000**: Mobile-friendly web control interface
 - **Emotion Synchronization**: Automatic sync across all ports
 - **Flexible Deployment**: Run servers independently or together
@@ -83,7 +83,7 @@ The system uses **three separate servers** for different purposes:
 │                     CLIENT INTERFACES                            │
 │  ┌──────────────┐ ┌──────────────┐ ┌─────────────────────────┐ │
 │  │ Desktop Web  │ │ Mobile Web   │ │ Emotion Display         │ │
-│  │ Port 8000    │ │ Port 3000    │ │ Port 1000               │ │
+│  │ Port 8000    │ │ Port 3000    │ │ Port 10000              │ │
 │  └──────┬───────┘ └──────┬───────┘ └────────────┬────────────┘ │
 └─────────┼────────────────┼──────────────────────┼──────────────┘
           │                │                      │
@@ -100,7 +100,7 @@ The system uses **three separate servers** for different purposes:
 │  └──────────┬──────────────────────────────┬──────────────────┘  │
 │             │                              │                      │
 │  ┌──────────▼─────────────┐  ┌────────────▼──────────────────┐  │
-│  │ Port 1000:             │  │ Port 3000:                    │  │
+│  │ Port 10000:            │  │ Port 3000:                    │  │
 │  │ Emotion Display        │  │ Mobile Web Interface          │  │
 │  │ - Animated face        │  │ - Touch controls              │  │
 │  │ - Auto-sync emotions   │  │ - Camera view                 │  │
@@ -132,7 +132,7 @@ The system uses **three separate servers** for different purposes:
 | Port | Purpose | Features |
 |------|---------|----------|
 | **8000** | Primary Control | Movement, camera, AI, ROS, mental health |
-| **1000** | Emotion Display | Dedicated animated face, auto-sync |
+| **10000** | Emotion Display | Dedicated animated face, auto-sync |
 | **3000** | Mobile Web | Touch-optimized controls, lightweight |
 
 ## 📋 Prerequisites
@@ -201,7 +201,7 @@ python launch_all.py
 
 This starts:
 - **Port 8000**: Primary control server
-- **Port 1000**: Emotion display server
+- **Port 10000**: Emotion display server
 - **Port 3000**: Mobile web interface
 
 **Option B: Start Servers Individually**
@@ -209,7 +209,7 @@ This starts:
 # Terminal 1 - Primary server (port 8000)
 python server.py
 
-# Terminal 2 - Emotion display (port 1000)
+# Terminal 2 - Emotion display (port 10000)
 python emotion_display_server.py
 
 # Terminal 3 - Mobile web interface (port 3000)
@@ -234,7 +234,7 @@ python launch_all.py --server-only
 curl http://localhost:8000/health
 
 # Check emotion display
-curl http://localhost:1000/health
+curl http://localhost:10000/health
 
 # Check mobile web
 curl http://localhost:3000/health
@@ -246,8 +246,8 @@ curl http://localhost:3000/health
 - URL: `http://localhost:8000`
 - Features: Full robot control, camera, AI conversation
 
-**Emotion Display (Port 1000)**
-- URL: `http://localhost:1000`
+**Emotion Display (Port 10000)**
+- URL: `http://localhost:10000`
 - Features: Animated face, emotion display
 - Best viewed full-screen on a dedicated monitor
 
