@@ -26,6 +26,10 @@ logger = logging.getLogger(__name__)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+# Message type constants
+MSG_TYPE_CAMERA_FRAME = "camera_frame"
+MSG_TYPE_EMOTION_DETECTION = "emotion_detection"
+
 class EmotionDetectionState:
     def __init__(self):
         self.clients = []
@@ -101,7 +105,7 @@ class EmotionDetectionState:
                 import json
                 data = json.loads(message)
                 
-                if data.get('type') == 'camera_frame':
+                if data.get('type') == MSG_TYPE_CAMERA_FRAME:
                     self.latest_camera_frame = data.get('frame')
                     # Process frame for emotion detection
                     asyncio.create_task(self.process_frame())
@@ -187,7 +191,7 @@ class EmotionDetectionState:
         for client in self.clients[:]:
             try:
                 await client.send_json({
-                    'type': 'emotion_detection',
+                    'type': MSG_TYPE_EMOTION_DETECTION,
                     'frame': processed_frame,
                     'emotions': emotions,
                     'current_emotion': self.current_emotion
@@ -582,14 +586,14 @@ async def get_current_emotion():
     }
 
 @app.post("/api/emotion/response")
-async def get_emotion_response_api(emotion: str = None):
+async def get_emotion_response_api(emotion: str = "neutral"):
     """Get empathetic response for detected emotion"""
-    if emotion is None:
-        emotion = emotion_state.current_emotion
+    # Use provided emotion or fall back to current detected emotion
+    emotion_to_use = emotion if emotion != "neutral" or not emotion_state.current_emotion else emotion_state.current_emotion
     
-    response = await emotion_state.get_emotion_response(emotion)
+    response = await emotion_state.get_emotion_response(emotion_to_use)
     return {
-        'emotion': emotion,
+        'emotion': emotion_to_use,
         'response': response
     }
 

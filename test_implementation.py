@@ -188,7 +188,9 @@ def main():
     print("AI Pet Robot - Features Implementation Test")
     print("=" * 60)
     
-    os.chdir("/home/runner/work/AI-Pet-robot-for-mental-health-and-personal-assistance/AI-Pet-robot-for-mental-health-and-personal-assistance")
+    # Determine project root dynamically
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(script_dir)
     
     tests = [
         ("File Existence", test_files_exist),

@@ -527,7 +527,13 @@ async def root():
             // Update tabs
             const tabs = document.querySelectorAll('.mode-tab');
             tabs.forEach(tab => tab.classList.remove('active'));
-            event.target.classList.add('active');
+            
+            // Find and activate the clicked tab
+            const clickedTab = Array.from(tabs).find(tab => 
+                (mode === 'buttons' && tab.textContent.includes('Button')) ||
+                (mode === 'joystick' && tab.textContent.includes('Joystick'))
+            );
+            if (clickedTab) clickedTab.classList.add('active');
             
             // Update content
             const contents = document.querySelectorAll('.control-mode-content');

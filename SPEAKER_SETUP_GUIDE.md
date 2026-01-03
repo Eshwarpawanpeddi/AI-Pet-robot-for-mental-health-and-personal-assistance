@@ -244,6 +244,7 @@ pip3 install pydub
 **Example Python code:**
 ```python
 import pygame
+import subprocess
 
 # Initialize mixer
 pygame.mixer.init()
@@ -252,9 +253,11 @@ pygame.mixer.init()
 sound = pygame.mixer.Sound('notification.wav')
 sound.play()
 
-# Or use espeak from Python
-import os
-os.system('espeak "Hello World"')
+# Or use espeak from Python (safer method)
+subprocess.run(['espeak', 'Hello World'], check=True)
+
+# Alternative with more control
+subprocess.run(['espeak', '-v', 'en', '-s', '150', 'Hello World'], check=True)
 ```
 
 ## Audio Settings for Best Quality
