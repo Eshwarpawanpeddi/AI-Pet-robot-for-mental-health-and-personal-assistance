@@ -26,7 +26,7 @@ This robot system uses **three separate servers** running on different ports for
 - Smooth animations and transitions
 - Can be displayed on separate monitor/screen
 
-**Access:** `http://localhost:1000`
+**Access:** `http://localhost:10000`
 
 ### Port 3000 - Mobile Web Interface
 **Purpose:** Mobile-friendly control interface
@@ -183,7 +183,7 @@ python launch_all.py --server-only
 curl http://localhost:8000/health
 
 # Check emotion display
-curl http://localhost:1000/health
+curl http://localhost:10000/health
 
 # Check mobile web
 curl http://localhost:3000/health
@@ -444,7 +444,7 @@ Same commands as `/ws/control` on port 8000 - automatically forwarded.
 ```bash
 # Find process using port
 lsof -i :8000
-lsof -i :1000
+lsof -i :10000
 lsof -i :3000
 
 # Kill process
@@ -470,12 +470,12 @@ curl http://localhost:8000/health
 
 **Check network connectivity:**
 ```bash
-curl http://localhost:1000/health
+curl http://localhost:10000/health
 ```
 
 **Manual emotion update:**
 ```bash
-curl -X POST http://localhost:1000/api/emotion \
+curl -X POST http://localhost:10000/api/emotion \
   -H "Content-Type: application/json" \
   -d '{"emotion": "happy"}'
 ```
@@ -491,7 +491,7 @@ curl -X POST http://localhost:1000/api/emotion \
 ```bash
 # Allow ports
 sudo ufw allow 8000
-sudo ufw allow 1000
+sudo ufw allow 10000
 sudo ufw allow 3000
 ```
 
