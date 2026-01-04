@@ -55,6 +55,11 @@ tmp/
 # Hardware configuration with credentials
 hardware/esp12e/config.h
 
+# YOLO models (will be downloaded automatically)
+*.pt
+yolov*.pt
+yolov8*.pt
+
 # CodeQL
 _codeql_detected_source_root
 
