@@ -195,7 +195,7 @@ class AutonomousNavigator:
             detections = []
             for result in results:
                 boxes = result.boxes
-                # Check if boxes exist (None when no detections)
+                # Continue only if detections exist (boxes is None when no objects detected)
                 if boxes is not None:
                     for box in boxes:
                         # Get box coordinates

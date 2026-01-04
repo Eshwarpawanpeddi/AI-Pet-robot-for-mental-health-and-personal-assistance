@@ -49,6 +49,9 @@ class CameraStreamManager:
         Args:
             callback: Async function to call when new frame arrives
                      Signature: async def callback(frame_data: dict)
+                     Note: Async callbacks are strongly preferred for best performance.
+                           Synchronous callbacks will be run in an executor which may
+                           cause performance degradation with many subscribers.
         """
         with self.lock:
             if callback not in self.subscribers:
