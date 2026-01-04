@@ -58,9 +58,11 @@ class AutonomousNavigator:
         self.safe_speed = 50  # Base speed when clear
         self.caution_speed = 30  # Speed when obstacles detected
         self.min_safe_width = 0.2  # Minimum clear width fraction
+        self.narrow_passage_speed_factor = 0.5  # Speed reduction for narrow passages
         
         # State tracking
         self.last_command = MotorCommand.STOP
+        self.last_speed = 0
         self.last_detection_time = None
         self.detection_history = []
         self.max_history = 10
@@ -298,7 +300,7 @@ class AutonomousNavigator:
                 decision['reason'] = 'Obstacles surrounding - stopping'
             else:
                 decision['command'] = MotorCommand.FORWARD
-                decision['speed'] = self.caution_speed // 2
+                decision['speed'] = int(self.caution_speed * self.narrow_passage_speed_factor)
                 decision['mode'] = NavigationMode.AVOIDING
                 decision['reason'] = 'Narrow passage - proceeding slowly'
         
@@ -314,10 +316,11 @@ class AutonomousNavigator:
         command = decision['command']
         speed = decision['speed']
         
-        # Only send command if it differs from last command (avoid spam)
-        if command != self.last_command:
+        # Send command if it differs from last command or speed changed
+        if command != self.last_command or speed != self.last_speed:
             await self._send_motor_command(command, speed)
             self.last_command = command
+            self.last_speed = speed
             self.current_mode = decision['mode']
             logger.info(f"Navigation: {decision['reason']} - {command.value} at speed {speed}")
     
