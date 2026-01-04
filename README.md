@@ -5,14 +5,15 @@ An empathetic AI-powered companion robot designed specifically for **mental heal
 ## 🎉 Latest Updates (January 2026)
 
 ### 🆕 Multi-Port Architecture (v2.1) - NEW FEATURES!
-- **Port 8000**: Primary control server (movement, camera, AI, ROS)
+- **Port 8000**: Primary control server (movement, camera, AI, ROS, autonomous navigation)
 - **Port 10000**: Dedicated emotion display server (animated face)
 - **Port 3000**: ✨ Enhanced mobile web interface with joystick, WASD controls, and speed adjustment
-- **Port 9999**: 😊 **NEW** - Real-time facial emotion detection with AI analysis
+- **Port 9999**: 😊 Real-time facial emotion detection with AI analysis
 - **Emotion Synchronization**: Automatic sync across all ports
 - **Flexible Deployment**: Run servers independently or together
 
 ### ✨ Latest Features Added:
+- 🤖 **Autonomous Navigation**: YOLO-based obstacle detection and avoidance with shared camera stream
 - 🎮 **Enhanced Port 3000 Controls**: Joystick mode, WASD keyboard controls, speed slider, larger camera view
 - 😊 **Emotion Detection (Port 9999)**: Real-time facial expression analysis using emotion_model.h5
 - 🔊 **Speaker Support**: Complete guide for 40mm 8Ω speaker setup with multiple connection options
@@ -24,7 +25,7 @@ An empathetic AI-powered companion robot designed specifically for **mental heal
 - 🎨 **Enhanced UI**: Split-panel interface with animated emotions and camera view
 - 📱 **Mobile App Enhancements**: Camera view, control mode toggle, improved connectivity
 
-**See [FEATURES_GUIDE.md](FEATURES_GUIDE.md) for new features or [SETUP_GUIDE.md](SETUP_GUIDE.md) for setup instructions.**
+**See [AUTONOMOUS_NAVIGATION.md](AUTONOMOUS_NAVIGATION.md) for autonomous navigation setup, [FEATURES_GUIDE.md](FEATURES_GUIDE.md) for other features, or [SETUP_GUIDE.md](SETUP_GUIDE.md) for setup instructions.**
 
 ## 🧠 Mental Health Focus
 
@@ -62,6 +63,8 @@ This robot is designed to:
 - **Image Analysis**: Visual context understanding for better assistance
 
 ### Technical Features
+- **Autonomous Navigation**: YOLO-based obstacle detection and avoidance with intelligent pathfinding
+- **Shared Camera Stream**: Multi-consumer architecture for parallel processing (navigation + emotion detection)
 - **Live Camera Streaming**: Real-time video feed at 10 FPS from Raspberry Pi camera
 - **Text-to-Speech**: Offline speech synthesis on Raspberry Pi (espeak)
 - **Voice Interaction**: Natural conversation via Gemini AI
@@ -73,7 +76,7 @@ This robot is designed to:
 - **WebSocket Communication**: Real-time responsiveness with multiple connection types
 - **Mental Health Monitoring**: Real-time emotion tracking and crisis detection
 - **Mobile App**: Android/iOS app with camera view and full control (Flutter)
-- **Control Modes**: Manual control or autonomous ROS navigation
+- **Control Modes**: Manual control, autonomous navigation, or ROS autonomous
 - **Security**: Token-based authentication and encrypted connections
 - **Privacy-First**: All data stays on your device
 
@@ -136,7 +139,7 @@ The system uses **three separate servers** for different purposes:
 
 | Port | Purpose | Features |
 |------|---------|----------|
-| **8000** | Primary Control | Movement, camera, AI, ROS, mental health |
+| **8000** | Primary Control | Movement, camera, AI, ROS, mental health, autonomous navigation |
 | **10000** | Emotion Display | Dedicated animated face, auto-sync |
 | **3000** | Mobile Web | ✨ Touch controls, joystick, WASD, speed adjustment |
 | **9999** | Emotion Detection | 😊 Facial expression analysis, AI responses |
@@ -611,6 +614,7 @@ controller.stop()
 
 ## 📚 Additional Documentation
 
+- **[AUTONOMOUS_NAVIGATION.md](AUTONOMOUS_NAVIGATION.md)** - 🆕 **Complete guide to autonomous navigation with YOLO object detection**
 - **[FEATURES_GUIDE.md](FEATURES_GUIDE.md)** - 🆕 **Complete guide to new features (Port 3000, Emotion Detection, etc.)**
 - **[ROS_SETUP_GUIDE.md](ROS_SETUP_GUIDE.md)** - 🆕 **Complete ROS installation and usage guide**
 - **[SPEAKER_SETUP_GUIDE.md](SPEAKER_SETUP_GUIDE.md)** - 🆕 **Hardware guide for 40mm 8Ω speaker**
