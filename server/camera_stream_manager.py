@@ -110,7 +110,7 @@ class CameraStreamManager:
                     await callback(frame_data)
                 else:
                     # If not async, run in executor
-                    await asyncio.get_event_loop().run_in_executor(None, callback, frame_data)
+                    await asyncio.get_running_loop().run_in_executor(None, callback, frame_data)
             except Exception as e:
                 logger.error(f"Error notifying subscriber: {e}")
                 # Optionally remove failed subscriber

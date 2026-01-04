@@ -60,6 +60,10 @@ class AutonomousNavigator:
         self.min_safe_width = 0.2  # Minimum clear width fraction
         self.narrow_passage_speed_factor = 0.5  # Speed reduction for narrow passages
         
+        # Performance optimization
+        self.frame_skip = 2  # Process every Nth frame (1 = process all frames)
+        self.frame_counter = 0
+        
         # State tracking
         self.last_command = MotorCommand.STOP
         self.last_speed = 0
@@ -138,6 +142,11 @@ class AutonomousNavigator:
         if not self.is_enabled or not self.model:
             return
         
+        # Frame skipping for performance optimization
+        self.frame_counter += 1
+        if self.frame_counter % self.frame_skip != 0:
+            return
+        
         try:
             # Decode frame
             frame_base64 = frame_data.get('frame', '')
@@ -186,19 +195,21 @@ class AutonomousNavigator:
             detections = []
             for result in results:
                 boxes = result.boxes
-                for box in boxes:
-                    # Get box coordinates
-                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                    confidence = float(box.conf[0])
-                    class_id = int(box.cls[0])
-                    class_name = self.model.names[class_id]
-                    
-                    detections.append({
-                        'bbox': (int(x1), int(y1), int(x2), int(y2)),
-                        'confidence': confidence,
-                        'class_id': class_id,
-                        'class_name': class_name
-                    })
+                # Check if boxes exist (None when no detections)
+                if boxes is not None:
+                    for box in boxes:
+                        # Get box coordinates
+                        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                        confidence = float(box.conf[0])
+                        class_id = int(box.cls[0])
+                        class_name = self.model.names[class_id]
+                        
+                        detections.append({
+                            'bbox': (int(x1), int(y1), int(x2), int(y2)),
+                            'confidence': confidence,
+                            'class_id': class_id,
+                            'class_name': class_name
+                        })
             
             return detections
             
@@ -385,7 +396,8 @@ class AutonomousNavigator:
             'obstacle_distance_threshold': self.obstacle_distance_threshold,
             'safe_speed': self.safe_speed,
             'caution_speed': self.caution_speed,
-            'min_safe_width': self.min_safe_width
+            'min_safe_width': self.min_safe_width,
+            'frame_skip': self.frame_skip
         }
     
     def update_parameters(self, params: Dict):
@@ -405,6 +417,8 @@ class AutonomousNavigator:
             self.caution_speed = params['caution_speed']
         if 'min_safe_width' in params:
             self.min_safe_width = params['min_safe_width']
+        if 'frame_skip' in params:
+            self.frame_skip = max(1, int(params['frame_skip']))  # Ensure at least 1
         
         logger.info(f"Navigation parameters updated: {params}")
 

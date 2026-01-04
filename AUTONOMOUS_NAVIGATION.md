@@ -240,6 +240,7 @@ curl -X POST http://localhost:8000/api/navigation/parameters \
 | `safe_speed` | 50 | Speed when path is clear (0-100) |
 | `caution_speed` | 30 | Speed when obstacles detected (0-100) |
 | `min_safe_width` | 0.2 | Minimum clear width fraction to proceed (0.0-1.0) |
+| `frame_skip` | 2 | Process every Nth frame (1=all frames, higher=better performance) |
 
 ## How It Works
 
@@ -545,10 +546,16 @@ Update navigation parameters.
 **Cause**: YOLO detection on every frame
 
 **Solutions**:
-1. Reduce camera frame rate on Raspberry Pi
-2. Process every Nth frame instead of all frames
-3. Use GPU if available
-4. Lower resolution if possible
+1. Increase frame skip (default is 2):
+```bash
+# Process every 3rd frame instead of every 2nd
+curl -X POST http://localhost:8000/api/navigation/parameters \
+  -H "Content-Type: application/json" \
+  -d '{"frame_skip": 3}'
+```
+2. Reduce camera frame rate on Raspberry Pi (edit raspberry_pi_controller.py)
+3. Use GPU if available (CUDA-enabled GPU provides 5x speed boost)
+4. Lower camera resolution if possible (in Raspberry Pi config)
 
 ### Erratic Movement
 
