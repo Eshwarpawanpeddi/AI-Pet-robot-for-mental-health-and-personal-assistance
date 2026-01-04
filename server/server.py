@@ -13,6 +13,8 @@ import google.generativeai as genai
 import uvicorn
 import aiohttp
 from gemini_integration import GeminiMultimodalIntegration
+from camera_stream_manager import camera_stream_manager
+from autonomous_navigation import autonomous_navigator
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -35,12 +37,15 @@ class RobotState:
         self.last_transcript = ""
         self.camera_enabled = False
         self.camera_clients = []  # Clients viewing camera feed
-        self.control_mode = "manual"  # manual or autonomous
+        self.control_mode = "manual"  # manual, autonomous, or autonomous_navigation
         self.latest_camera_frame = None
         # Mental health monitoring
         self.user_emotion_history = []  # Track emotion over time
         self.mental_health_insights = []
         self.concern_level = 0  # 0-10 scale
+        # Autonomous navigation
+        self.navigation_enabled = False
+        self.navigation_status = {}
 
 robot_state = RobotState()
 
@@ -53,10 +58,40 @@ async def initialize_gemini():
         robot_state.gemini_session = gemini_integration
         logger.info("Gemini Multimodal API initialized successfully")
 
+async def initialize_navigation():
+    """Initialize autonomous navigation system"""
+    try:
+        # Initialize YOLO model
+        success = await autonomous_navigator.initialize_model()
+        if success:
+            logger.info("Autonomous navigation system initialized successfully")
+            
+            # Set motor command callback
+            async def motor_command_callback(command: str, speed: int):
+                if robot_state.raspberry_pi_client:
+                    await robot_state.raspberry_pi_client.send_json({
+                        "type": "move",
+                        "direction": command,
+                        "speed": speed
+                    })
+            
+            autonomous_navigator.set_motor_command_callback(motor_command_callback)
+            
+            # Subscribe to camera stream
+            camera_stream_manager.subscribe(autonomous_navigator.process_frame)
+            logger.info("Navigation subscribed to camera stream")
+        else:
+            logger.warning("Failed to initialize navigation - will be available when ultralytics is installed")
+    except Exception as e:
+        logger.error(f"Error initializing navigation: {e}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize Gemini
     await initialize_gemini()
+    
+    # Initialize autonomous navigation
+    await initialize_navigation()
     
     # Start background status logging
     async def log_status():
@@ -68,6 +103,7 @@ async def lifespan(app: FastAPI):
             logger.info(f"   - ROS Bridge: {'✓ Connected' if robot_state.ros_client else '✗ Not connected'}")
             logger.info(f"   - Camera: {'✓ Active' if robot_state.camera_enabled else '○ Inactive'}")
             logger.info(f"   - Control Mode: {robot_state.control_mode.upper()}")
+            logger.info(f"   - Navigation: {'✓ Active' if robot_state.navigation_enabled else '○ Inactive'}")
             logger.info(f"   - Mental Health: Concern Level {robot_state.concern_level}/10")
             logger.info("")
             await asyncio.sleep(30)  # Log status every 30 seconds
@@ -137,6 +173,21 @@ async def websocket_control(websocket: WebSocket):
             elif command_type == 'stop_listening':
                 robot_state.is_listening = False
                 await broadcast_state()
+            elif command_type == 'start_navigation':
+                # Start autonomous navigation
+                if await autonomous_navigator.start_navigation():
+                    robot_state.navigation_enabled = True
+                    robot_state.control_mode = 'autonomous_navigation'
+                    logger.info("Autonomous navigation started")
+                await broadcast_state()
+            elif command_type == 'stop_navigation':
+                # Stop autonomous navigation
+                await autonomous_navigator.stop_navigation()
+                robot_state.navigation_enabled = False
+                if robot_state.control_mode == 'autonomous_navigation':
+                    robot_state.control_mode = 'manual'
+                logger.info("Autonomous navigation stopped")
+                await broadcast_state()
             
             await broadcast_state()
     except:
@@ -156,8 +207,16 @@ async def websocket_raspberry_pi(websocket: WebSocket):
             msg_type = data.get('type')
             
             if msg_type == 'camera_frame':
-                # Broadcast camera frame to subscribed clients
+                # Store frame in robot state
                 robot_state.latest_camera_frame = data.get('frame')
+                
+                # Publish to camera stream manager for shared consumption
+                await camera_stream_manager.publish_frame({
+                    'frame': data.get('frame'),
+                    'timestamp': datetime.now().isoformat()
+                })
+                
+                # Broadcast camera frame to subscribed clients (legacy support)
                 for client in robot_state.camera_clients:
                     try:
                         await client.send_json({
@@ -383,7 +442,9 @@ async def broadcast_state():
         'camera_enabled': robot_state.camera_enabled,
         'control_mode': robot_state.control_mode,
         'raspberry_pi_connected': robot_state.raspberry_pi_client is not None,
-        'ros_connected': robot_state.ros_client is not None
+        'ros_connected': robot_state.ros_client is not None,
+        'navigation_enabled': robot_state.navigation_enabled,
+        'navigation_status': autonomous_navigator.get_status() if robot_state.navigation_enabled else {}
     }
     for client in robot_state.connected_clients:
         try:
@@ -523,6 +584,62 @@ async def get_mental_health_insights():
         'recent_emotions': robot_state.user_emotion_history[-10:] if robot_state.user_emotion_history else [],
         'insights': robot_state.mental_health_insights[-5:] if robot_state.mental_health_insights else [],
         'recommendation': get_recommendation(mental_state, robot_state.concern_level)
+    }
+
+@app.post("/api/navigation/start")
+async def start_autonomous_navigation():
+    """Start autonomous navigation mode"""
+    if not autonomous_navigator.model:
+        return {
+            'success': False,
+            'message': 'Navigation model not loaded. Please ensure ultralytics is installed.'
+        }
+    
+    success = await autonomous_navigator.start_navigation()
+    if success:
+        robot_state.navigation_enabled = True
+        robot_state.control_mode = 'autonomous_navigation'
+        # Ensure camera is enabled
+        if not robot_state.camera_enabled:
+            await start_camera()
+    
+    return {
+        'success': success,
+        'message': 'Autonomous navigation started' if success else 'Failed to start navigation',
+        'status': autonomous_navigator.get_status()
+    }
+
+@app.post("/api/navigation/stop")
+async def stop_autonomous_navigation():
+    """Stop autonomous navigation mode"""
+    await autonomous_navigator.stop_navigation()
+    robot_state.navigation_enabled = False
+    if robot_state.control_mode == 'autonomous_navigation':
+        robot_state.control_mode = 'manual'
+    
+    return {
+        'success': True,
+        'message': 'Autonomous navigation stopped',
+        'status': autonomous_navigator.get_status()
+    }
+
+@app.get("/api/navigation/status")
+async def get_navigation_status():
+    """Get autonomous navigation status"""
+    return {
+        'navigation': autonomous_navigator.get_status(),
+        'parameters': autonomous_navigator.get_parameters(),
+        'camera_stream': camera_stream_manager.get_stats()
+    }
+
+@app.post("/api/navigation/parameters")
+async def update_navigation_parameters(params: Dict):
+    """Update navigation parameters"""
+    autonomous_navigator.update_parameters(params)
+    return {
+        'success': True,
+        'message': 'Parameters updated',
+        'parameters': autonomous_navigator.get_parameters()
     }
 
 def get_recommendation(mental_state: str, concern_level: int) -> str:
