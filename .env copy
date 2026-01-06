@@ -1,10 +1,14 @@
-# Gemini API Configuration (Optional - required for voice features)
-#Intigrate api
+# Gemini API Configuration (Required for AI features)
 # Get your API key from: https://makersuite.google.com/app/apikey
-GEMINI_API_KEY="key_here"
+GEMINI_API_KEY="your-api-key-here"
 
 # Server Configuration
 LOG_LEVEL=INFO
+
+# Gemini Port Control (Optional - defaults to true)
+# Enable or disable Gemini AI on specific ports
+GEMINI_ENABLED_PORT_8000=true
+GEMINI_ENABLED_PORT_3000=true
 
 # WebSocket Security (Optional - for development only)
 # Set to "true" to disable WebSocket authentication
@@ -15,3 +19,12 @@ DISABLE_WS_AUTH=false
 RASPBERRY_PI_IP=192.168.1.100
 ROBOT_NAME=MyPetRobot
 
+# Emotion Detection Server
+EMOTION_DETECTION_PORT=9999
+EMOTION_DETECTION_URL=http://localhost:9999
+
+# Smart Home Integration (Optional)
+SMART_HOME_ENABLED=true
+# MQTT_BROKER_URL=mqtt://localhost:1883
+# MQTT_USERNAME=
+# MQTT_PASSWORD=

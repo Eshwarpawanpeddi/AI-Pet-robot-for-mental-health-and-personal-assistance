@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 import asyncio
 import logging
 import os
-from typing import Dict
+from typing import Dict, Optional
 from datetime import datetime
 from dotenv import load_dotenv
 import google.generativeai as genai
@@ -15,6 +15,7 @@ import aiohttp
 from gemini_integration import GeminiMultimodalIntegration
 from camera_stream_manager import camera_stream_manager
 from autonomous_navigation import autonomous_navigator
+from smart_home_integration import smart_home, register_example_devices
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -100,6 +101,15 @@ async def lifespan(app: FastAPI):
     # Initialize autonomous navigation
     await initialize_navigation()
     
+    # Initialize smart home integration
+    try:
+        await smart_home.initialize()
+        # Register example devices (for demonstration)
+        await register_example_devices()
+        logger.info("Smart home integration initialized")
+    except Exception as e:
+        logger.warning(f"Smart home integration not available: {e}")
+    
     # Start background status logging
     async def log_status():
         await asyncio.sleep(10)  # Wait for initial connections
@@ -112,6 +122,7 @@ async def lifespan(app: FastAPI):
             logger.info(f"   - Control Mode: {robot_state.control_mode.upper()}")
             logger.info(f"   - Navigation: {'✓ Active' if robot_state.navigation_enabled else '○ Inactive'}")
             logger.info(f"   - Mental Health: Concern Level {robot_state.concern_level}/10")
+            logger.info(f"   - Smart Home: {'✓ Enabled' if smart_home.enabled else '○ Disabled'}")
             logger.info("")
             await asyncio.sleep(30)  # Log status every 30 seconds
     
@@ -119,6 +130,15 @@ async def lifespan(app: FastAPI):
     
     yield
     
+    # Cleanup
+    status_task.cancel()
+    try:
+        await status_task
+    except asyncio.CancelledError:
+        pass
+    
+    # Close smart home connections
+    await smart_home.close()
     # Cleanup
     status_task.cancel()
     try:
@@ -820,6 +840,92 @@ async def get_current_emotion():
         "robot_emotion": robot_state.emotion,
         "last_updated": datetime.now().isoformat()
     }
+
+# Smart Home Integration API Endpoints
+
+@app.get("/api/smarthome/devices")
+async def list_smart_devices():
+    """List all registered smart home devices"""
+    try:
+        devices = smart_home.list_devices()
+        return {
+            "status": "ok",
+            "devices": devices,
+            "count": len(devices),
+            "enabled": smart_home.enabled
+        }
+    except Exception as e:
+        logger.error(f"Error listing devices: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/smarthome/device/{device_id}")
+async def get_device_state(device_id: str):
+    """Get state of a specific smart home device"""
+    try:
+        state = await smart_home.get_device_state(device_id)
+        if state:
+            return {"status": "ok", "device": state}
+        else:
+            return {"status": "error", "message": "Device not found"}
+    except Exception as e:
+        logger.error(f"Error getting device state: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/smarthome/control")
+async def control_smart_device(data: Dict):
+    """
+    Control a smart home device
+    
+    Body:
+        device_id: str - Device identifier
+        command: str - Command to execute
+        parameters: dict - Optional command parameters
+    """
+    try:
+        device_id = data.get("device_id")
+        command = data.get("command")
+        parameters = data.get("parameters", {})
+        
+        if not device_id or not command:
+            return {
+                "status": "error",
+                "message": "Missing device_id or command"
+            }
+        
+        result = await smart_home.control_device(device_id, command, parameters)
+        logger.info(f"Smart home control: {device_id} -> {command}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error controlling device: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/smarthome/scene")
+async def execute_smart_scene(data: Dict):
+    """
+    Execute a smart home scene
+    
+    Body:
+        scene_name: str - Name of the scene
+        devices: dict - Device commands mapping
+    """
+    try:
+        scene_name = data.get("scene_name", "unnamed_scene")
+        devices = data.get("devices", {})
+        
+        if not devices:
+            return {
+                "status": "error",
+                "message": "No devices specified in scene"
+            }
+        
+        result = await smart_home.execute_scene(scene_name, devices)
+        logger.info(f"Executed scene: {scene_name}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error executing scene: {e}")
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     import sys
