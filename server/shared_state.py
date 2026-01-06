@@ -15,7 +15,7 @@ class RobotState:
     def __init__(self):
         # Emotion state
         self.emotion = "neutral"        # Robot face emotion
-        self.user_emotion = "neutral"   # Tracked sentiment of the user (deprecated, use current_emotion)
+        self.user_emotion = "neutral"   # Tracked sentiment of the user (deprecated in v2.2, use current_emotion)
         self.current_emotion = "unknown"  # Current detected user emotion from port 9999
         
         # Audio state

@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 import asyncio
 import logging
 import os
+import uuid
 from typing import Dict, Optional
 from datetime import datetime
 from dotenv import load_dotenv
@@ -26,7 +27,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 class RobotState:
     def __init__(self):
         self.emotion = "neutral"        # Robot face emotion
-        self.user_emotion = "neutral"   # Tracked sentiment of the user (deprecated)
+        self.user_emotion = "neutral"   # Tracked sentiment of the user (deprecated in v2.2, use current_emotion)
         self.current_emotion = "unknown"  # Current detected user emotion from port 9999
         self.is_listening = False
         self.is_speaking = False
@@ -139,12 +140,6 @@ async def lifespan(app: FastAPI):
     
     # Close smart home connections
     await smart_home.close()
-    # Cleanup
-    status_task.cancel()
-    try:
-        await status_task
-    except asyncio.CancelledError:
-        pass
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -759,7 +754,6 @@ async def get_gemini_status():
 @app.post("/api/tasks/schedule")
 async def schedule_task(data: Dict):
     """Schedule a task or reminder"""
-    import uuid
     task = {
         'id': str(uuid.uuid4()),
         'type': data.get('type', 'task'),

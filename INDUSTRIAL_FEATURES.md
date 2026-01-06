@@ -484,10 +484,14 @@ For issues or questions:
 
 ## Version History
 
-- **v2.1** - Initial industrial-level features release
+- **v2.2** - Industrial-level features release (January 2026)
   - Port-specific Gemini control
   - Emotion detection integration
-  - Task scheduling
+  - Task scheduling and reminders
   - Information retrieval
   - Smart home integration
-  - Enhanced audio support
+  - Enhanced audio support with multiple output modes
+- **v2.1** - Multi-port architecture and core features
+  - Autonomous navigation
+  - Enhanced mobile interface
+  - ROS integration
