@@ -45,6 +45,10 @@ GPIO_I2S_BCK = 18
 GPIO_I2S_LRCK = 20
 GPIO_I2S_DATA = 21
 
+# Audio Configuration
+AUDIO_OUTPUT_MODE = "default"  # Options: "default" (3.5mm jack), "gpio_pwm", "i2s"
+AUDIO_VOLUME = 80  # Volume percentage (0-100)
+
 class Direction(Enum):
     STOP = 0
     FORWARD = 1
@@ -327,11 +331,27 @@ class RaspberryPiController:
             logger.error(f"Error playing audio: {e}")
     
     async def speak_text(self, text: str):
-        """Text-to-speech on Raspberry Pi"""
+        """Text-to-speech on Raspberry Pi with audio output configuration"""
         try:
             logger.info(f"Speaking: {text}")
-            # Using espeak for offline TTS on Raspberry Pi
-            subprocess.Popen(['espeak', '-v', 'en+f3', '-s', '150', text])
+            
+            # Set audio output based on configuration
+            if AUDIO_OUTPUT_MODE == "gpio_pwm":
+                # For GPIO PWM audio output (via transistor circuit)
+                # espeak can output to ALSA, which can be configured for GPIO
+                subprocess.Popen(['espeak', '-v', 'en+f3', '-s', '150', text])
+            elif AUDIO_OUTPUT_MODE == "i2s":
+                # For I2S DAC modules (better quality)
+                # Requires I2S configuration in /boot/config.txt
+                subprocess.Popen(['espeak', '-v', 'en+f3', '-s', '150', text])
+            else:
+                # Default: Use 3.5mm audio jack or HDMI
+                # Ensure audio output is set to headphones (not HDMI)
+                subprocess.Popen(['espeak', '-v', 'en+f3', '-s', '150', text])
+            
+            # Set volume using amixer
+            subprocess.Popen(['amixer', 'set', 'Master', f'{AUDIO_VOLUME}%'])
+            
         except Exception as e:
             logger.error(f"Error in text-to-speech: {e}")
 

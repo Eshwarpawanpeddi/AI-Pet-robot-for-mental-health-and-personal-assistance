@@ -581,7 +581,8 @@ async def health_check():
 async def get_current_emotion():
     """Get current detected emotion"""
     return {
-        'emotion': emotion_state.current_emotion,
+        'current_emotion': emotion_state.current_emotion,
+        'emotion': emotion_state.current_emotion,  # For backward compatibility
         'history': emotion_state.emotion_history[-10:]  # Last 10 emotions
     }
 
