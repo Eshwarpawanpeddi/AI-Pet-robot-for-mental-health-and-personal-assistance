@@ -4,7 +4,18 @@ An empathetic AI-powered companion robot designed specifically for **mental heal
 
 ## 🎉 Latest Updates (January 2026)
 
-### 🆕 Multi-Port Architecture (v2.1) - NEW FEATURES!
+### 🆕 Industrial-Level Features (v2.2) - NEW!
+- 🎛️ **Port-Specific Gemini Control**: Enable/disable AI on ports 8000 and 3000 independently
+- 😊 **Integrated Emotion Detection**: Automatic emotion detection from port 9999 for context-aware AI
+- 📅 **Task Scheduling & Reminders**: Schedule tasks and set reminders through AI assistant
+- 🔍 **Information Retrieval**: Query information through Gemini for quick answers
+- 🏠 **Smart Home Integration**: Control IoT devices via MQTT, HTTP (lights, thermostats, locks, etc.)
+- 🔊 **Enhanced Audio Support**: Multiple speaker output modes (3.5mm, GPIO PWM, I2S DAC)
+- 📚 **Comprehensive API**: RESTful endpoints for all features with detailed documentation
+
+**See [INDUSTRIAL_FEATURES.md](INDUSTRIAL_FEATURES.md) for complete industrial-level features documentation.**
+
+### 🆕 Multi-Port Architecture (v2.1)
 - **Port 8000**: Primary control server (movement, camera, AI, ROS, autonomous navigation)
 - **Port 10000**: Dedicated emotion display server (animated face)
 - **Port 3000**: ✨ Enhanced mobile web interface with joystick, WASD controls, and speed adjustment
@@ -12,7 +23,7 @@ An empathetic AI-powered companion robot designed specifically for **mental heal
 - **Emotion Synchronization**: Automatic sync across all ports
 - **Flexible Deployment**: Run servers independently or together
 
-### ✨ Latest Features Added:
+### ✨ Core Features:
 - 🤖 **Autonomous Navigation**: YOLO-based obstacle detection and avoidance with shared camera stream
 - 🎮 **Enhanced Port 3000 Controls**: Joystick mode, WASD keyboard controls, speed slider, larger camera view
 - 😊 **Emotion Detection (Port 9999)**: Real-time facial expression analysis using emotion_model.h5
@@ -55,17 +66,24 @@ This robot is designed to:
 - **Personalized Recommendations**: Based on current mental state and concern level
 
 ### Personal Assistance
-- **Medication Reminders**: Never miss important doses
+- **Task Scheduling**: Schedule tasks and appointments through AI
+- **Smart Reminders**: Medication, appointments, and daily activity reminders
+- **Information Retrieval**: Quick answers to questions via Gemini
 - **Routine Building**: Establish healthy daily habits
 - **Self-Care Prompts**: Hydration, movement, rest reminders
 - **Goal Tracking**: Set and achieve wellness goals
 - **Social Connection**: Encouragement for healthy relationships
+- **Smart Home Control**: Control lights, thermostats, locks, and other IoT devices
 - **Image Analysis**: Visual context understanding for better assistance
 
 ### Technical Features
+- **Port-Specific Gemini Control**: Enable/disable AI independently on different ports
+- **Integrated Emotion Detection**: Real-time facial emotion detection via port 9999
+- **Smart Home IoT Integration**: MQTT, HTTP, and other protocol support
 - **Autonomous Navigation**: YOLO-based obstacle detection and avoidance with intelligent pathfinding
 - **Shared Camera Stream**: Multi-consumer architecture for parallel processing (navigation + emotion detection)
 - **Live Camera Streaming**: Real-time video feed at 10 FPS from Raspberry Pi camera
+- **Multi-Mode Audio**: Support for 3.5mm, GPIO PWM, and I2S DAC speakers
 - **Text-to-Speech**: Offline speech synthesis on Raspberry Pi (espeak)
 - **Voice Interaction**: Natural conversation via Gemini AI
 - **Multimodal API**: Process text, images, and audio simultaneously
@@ -614,6 +632,7 @@ controller.stop()
 
 ## 📚 Additional Documentation
 
+- **[INDUSTRIAL_FEATURES.md](INDUSTRIAL_FEATURES.md)** - 🆕 **Industrial-level features: Gemini control, emotion integration, tasks, smart home**
 - **[AUTONOMOUS_NAVIGATION.md](AUTONOMOUS_NAVIGATION.md)** - 🆕 **Complete guide to autonomous navigation with YOLO object detection**
 - **[FEATURES_GUIDE.md](FEATURES_GUIDE.md)** - 🆕 **Complete guide to new features (Port 3000, Emotion Detection, etc.)**
 - **[ROS_SETUP_GUIDE.md](ROS_SETUP_GUIDE.md)** - 🆕 **Complete ROS installation and usage guide**

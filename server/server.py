@@ -6,7 +6,8 @@ from contextlib import asynccontextmanager
 import asyncio
 import logging
 import os
-from typing import Dict
+import uuid
+from typing import Dict, Optional
 from datetime import datetime
 from dotenv import load_dotenv
 import google.generativeai as genai
@@ -15,6 +16,7 @@ import aiohttp
 from gemini_integration import GeminiMultimodalIntegration
 from camera_stream_manager import camera_stream_manager
 from autonomous_navigation import autonomous_navigator
+from smart_home_integration import smart_home, register_example_devices
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -25,7 +27,8 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 class RobotState:
     def __init__(self):
         self.emotion = "neutral"        # Robot face emotion
-        self.user_emotion = "neutral"   # Tracked sentiment of the user
+        self.user_emotion = "neutral"   # Tracked sentiment of the user (deprecated in v2.2, use current_emotion)
+        self.current_emotion = "unknown"  # Current detected user emotion from port 9999
         self.is_listening = False
         self.is_speaking = False
         self.battery_level = 100
@@ -46,6 +49,12 @@ class RobotState:
         # Autonomous navigation
         self.navigation_enabled = False
         self.navigation_status = {}
+        # Port-specific Gemini control
+        self.gemini_enabled_port_8000 = os.getenv("GEMINI_ENABLED_PORT_8000", "true").lower() == "true"
+        self.gemini_enabled_port_3000 = os.getenv("GEMINI_ENABLED_PORT_3000", "true").lower() == "true"
+        # Task scheduling and reminders
+        self.scheduled_tasks = []
+        self.reminders = []
 
 robot_state = RobotState()
 
@@ -93,6 +102,15 @@ async def lifespan(app: FastAPI):
     # Initialize autonomous navigation
     await initialize_navigation()
     
+    # Initialize smart home integration
+    try:
+        await smart_home.initialize()
+        # Register example devices (for demonstration)
+        await register_example_devices()
+        logger.info("Smart home integration initialized")
+    except Exception as e:
+        logger.warning(f"Smart home integration not available: {e}")
+    
     # Start background status logging
     async def log_status():
         await asyncio.sleep(10)  # Wait for initial connections
@@ -105,6 +123,7 @@ async def lifespan(app: FastAPI):
             logger.info(f"   - Control Mode: {robot_state.control_mode.upper()}")
             logger.info(f"   - Navigation: {'✓ Active' if robot_state.navigation_enabled else '○ Inactive'}")
             logger.info(f"   - Mental Health: Concern Level {robot_state.concern_level}/10")
+            logger.info(f"   - Smart Home: {'✓ Enabled' if smart_home.enabled else '○ Disabled'}")
             logger.info("")
             await asyncio.sleep(30)  # Log status every 30 seconds
     
@@ -118,6 +137,9 @@ async def lifespan(app: FastAPI):
         await status_task
     except asyncio.CancelledError:
         pass
+    
+    # Close smart home connections
+    await smart_home.close()
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -300,15 +322,47 @@ async def stop_camera():
         robot_state.camera_enabled = False
         logger.info("Camera streaming stopped")
 
+async def query_emotion_detection() -> str:
+    """Query emotion detection server (port 9999) for current user emotion"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                'http://localhost:9999/api/emotion',
+                timeout=aiohttp.ClientTimeout(total=2)
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    emotion = data.get('current_emotion', 'unknown')
+                    logger.info(f"Detected user emotion from port 9999: {emotion}")
+                    return emotion
+                else:
+                    logger.warning(f"Emotion detection API returned status {resp.status}")
+                    return "unknown"
+    except asyncio.TimeoutError:
+        logger.warning("Emotion detection query timed out")
+        return "unknown"
+    except Exception as e:
+        logger.debug(f"Could not query emotion detection: {e}")
+        return "unknown"
+
 async def handle_text_command(data: Dict):
     text = data.get('text', '')
     if not text: return
     
-    # Detect User Emotion from their input
-    robot_state.user_emotion = detect_emotion(text)
+    # Query emotion detection from port 9999
+    detected_emotion = await query_emotion_detection()
+    robot_state.current_emotion = detected_emotion
+    
+    # Update legacy field for backward compatibility
+    if detected_emotion != "unknown":
+        robot_state.user_emotion = detected_emotion
+    else:
+        # Fallback to text-based emotion detection
+        robot_state.user_emotion = detect_emotion(text)
+        robot_state.current_emotion = robot_state.user_emotion
     
     # Track emotion history for mental health monitoring
-    robot_state.user_emotion_history.append(robot_state.user_emotion)
+    robot_state.user_emotion_history.append(robot_state.current_emotion)
     if len(robot_state.user_emotion_history) > 50:  # Keep last 50 emotions
         robot_state.user_emotion_history.pop(0)
     
@@ -324,11 +378,16 @@ async def handle_text_command(data: Dict):
     robot_state.is_listening = True
     await broadcast_state()
     
-    if robot_state.gemini_session:
+    # Check if Gemini is enabled for port 8000
+    if robot_state.gemini_session and robot_state.gemini_enabled_port_8000:
         robot_state.is_speaking = True
         await broadcast_state()
         
-        response = await robot_state.gemini_session.send_text(text)
+        # Update Gemini with current user emotion
+        robot_state.gemini_session.set_user_emotion(robot_state.current_emotion)
+        
+        # Send text with emotion context
+        response = await robot_state.gemini_session.send_text(text, include_emotion_context=True)
         if response:
             response_text = response['text']
             # Robot reacts with its own detected emotion
@@ -344,6 +403,8 @@ async def handle_text_command(data: Dict):
                 })
         
         robot_state.is_speaking = False
+    elif not robot_state.gemini_enabled_port_8000:
+        logger.info("Gemini disabled on port 8000, skipping AI response")
     
     robot_state.is_listening = False
     await broadcast_state()
@@ -654,6 +715,211 @@ def get_recommendation(mental_state: str, concern_level: int) -> str:
         return "Keep monitoring your mood. Engage in activities you enjoy."
     else:
         return "You're doing well! Keep up the positive habits."
+
+# New API endpoints for industrial-level features
+
+@app.post("/api/gemini/control")
+async def control_gemini(data: Dict):
+    """Enable or disable Gemini on specific ports"""
+    port = data.get('port')
+    enabled = data.get('enabled', True)
+    
+    if port == 8000:
+        robot_state.gemini_enabled_port_8000 = enabled
+        logger.info(f"Gemini on port 8000: {'enabled' if enabled else 'disabled'}")
+    elif port == 3000:
+        robot_state.gemini_enabled_port_3000 = enabled
+        logger.info(f"Gemini on port 3000: {'enabled' if enabled else 'disabled'}")
+    else:
+        return {"status": "error", "message": "Invalid port. Use 8000 or 3000"}
+    
+    await broadcast_state()
+    return {
+        "status": "ok",
+        "port": port,
+        "enabled": enabled,
+        "message": f"Gemini {'enabled' if enabled else 'disabled'} on port {port}"
+    }
+
+@app.get("/api/gemini/status")
+async def get_gemini_status():
+    """Get Gemini status for all ports"""
+    return {
+        "initialized": robot_state.gemini_session is not None,
+        "port_8000_enabled": robot_state.gemini_enabled_port_8000,
+        "port_3000_enabled": robot_state.gemini_enabled_port_3000,
+        "current_user_emotion": robot_state.current_emotion
+    }
+
+@app.post("/api/tasks/schedule")
+async def schedule_task(data: Dict):
+    """Schedule a task or reminder"""
+    task = {
+        'id': str(uuid.uuid4()),
+        'type': data.get('type', 'task'),
+        'description': data.get('description', ''),
+        'time': data.get('time', ''),
+        'created_at': datetime.now().isoformat(),
+        'status': 'pending'
+    }
+    
+    if task['type'] == 'reminder':
+        robot_state.reminders.append(task)
+    else:
+        robot_state.scheduled_tasks.append(task)
+    
+    logger.info(f"Scheduled {task['type']}: {task['description']}")
+    return {"status": "ok", "task": task}
+
+@app.get("/api/tasks/list")
+async def list_tasks():
+    """List all scheduled tasks and reminders"""
+    return {
+        "tasks": robot_state.scheduled_tasks,
+        "reminders": robot_state.reminders,
+        "total": len(robot_state.scheduled_tasks) + len(robot_state.reminders)
+    }
+
+@app.delete("/api/tasks/{task_id}")
+async def delete_task(task_id: str):
+    """Delete a scheduled task or reminder"""
+    # Remove from both lists
+    initial_task_count = len(robot_state.scheduled_tasks)
+    initial_reminder_count = len(robot_state.reminders)
+    
+    robot_state.scheduled_tasks = [t for t in robot_state.scheduled_tasks if t.get('id') != task_id]
+    robot_state.reminders = [r for r in robot_state.reminders if r.get('id') != task_id]
+    
+    deleted = (len(robot_state.scheduled_tasks) < initial_task_count or 
+               len(robot_state.reminders) < initial_reminder_count)
+    
+    if deleted:
+        logger.info(f"Deleted task: {task_id}")
+        return {"status": "ok", "message": "Task deleted"}
+    else:
+        return {"status": "error", "message": "Task not found"}
+
+@app.post("/api/query")
+async def information_query(data: Dict):
+    """Process information retrieval query through Gemini"""
+    query = data.get('query', '')
+    if not query:
+        return {"status": "error", "message": "No query provided"}
+    
+    if not robot_state.gemini_session or not robot_state.gemini_enabled_port_8000:
+        return {"status": "error", "message": "Gemini not available"}
+    
+    try:
+        # Format as information retrieval request
+        formatted_query = f"[Information Request] {query}"
+        response = await robot_state.gemini_session.send_text(formatted_query, include_emotion_context=False)
+        
+        if response:
+            return {
+                "status": "ok",
+                "query": query,
+                "response": response['text']
+            }
+        else:
+            return {"status": "error", "message": "Failed to get response"}
+    except Exception as e:
+        logger.error(f"Error processing query: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/emotion/current")
+async def get_current_emotion():
+    """Get current detected user emotion"""
+    return {
+        "current_emotion": robot_state.current_emotion,
+        "robot_emotion": robot_state.emotion,
+        "last_updated": datetime.now().isoformat()
+    }
+
+# Smart Home Integration API Endpoints
+
+@app.get("/api/smarthome/devices")
+async def list_smart_devices():
+    """List all registered smart home devices"""
+    try:
+        devices = smart_home.list_devices()
+        return {
+            "status": "ok",
+            "devices": devices,
+            "count": len(devices),
+            "enabled": smart_home.enabled
+        }
+    except Exception as e:
+        logger.error(f"Error listing devices: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/smarthome/device/{device_id}")
+async def get_device_state(device_id: str):
+    """Get state of a specific smart home device"""
+    try:
+        state = await smart_home.get_device_state(device_id)
+        if state:
+            return {"status": "ok", "device": state}
+        else:
+            return {"status": "error", "message": "Device not found"}
+    except Exception as e:
+        logger.error(f"Error getting device state: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/smarthome/control")
+async def control_smart_device(data: Dict):
+    """
+    Control a smart home device
+    
+    Body:
+        device_id: str - Device identifier
+        command: str - Command to execute
+        parameters: dict - Optional command parameters
+    """
+    try:
+        device_id = data.get("device_id")
+        command = data.get("command")
+        parameters = data.get("parameters", {})
+        
+        if not device_id or not command:
+            return {
+                "status": "error",
+                "message": "Missing device_id or command"
+            }
+        
+        result = await smart_home.control_device(device_id, command, parameters)
+        logger.info(f"Smart home control: {device_id} -> {command}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error controlling device: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/smarthome/scene")
+async def execute_smart_scene(data: Dict):
+    """
+    Execute a smart home scene
+    
+    Body:
+        scene_name: str - Name of the scene
+        devices: dict - Device commands mapping
+    """
+    try:
+        scene_name = data.get("scene_name", "unnamed_scene")
+        devices = data.get("devices", {})
+        
+        if not devices:
+            return {
+                "status": "error",
+                "message": "No devices specified in scene"
+            }
+        
+        result = await smart_home.execute_scene(scene_name, devices)
+        logger.info(f"Executed scene: {scene_name}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error executing scene: {e}")
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     import sys
