@@ -26,7 +26,7 @@ aiofiles==23.2.1
 # Async HTTP client support
 aiohttp>=3.13.3
 
-# Computer vision for emotion detection and autonomous navigation
+# Computer vision library
 opencv-python==4.8.1.78
 
 # Machine learning for emotion detection
