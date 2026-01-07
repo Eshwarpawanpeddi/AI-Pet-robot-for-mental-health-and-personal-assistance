@@ -82,7 +82,8 @@ class PortVerifier:
                     f"http://localhost:{port}{endpoint}",
                     timeout=aiohttp.ClientTimeout(total=2)
                 ) as response:
-                    if response.status in [200, 404]:  # 404 is ok for some endpoints
+                    # 200 = OK, 404 = Endpoint exists but resource not found (acceptable for testing)
+                    if response.status in [200, 404]:
                         return True, f"HTTP {response.status}"
                     else:
                         return False, f"HTTP {response.status}"

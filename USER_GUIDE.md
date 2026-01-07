@@ -219,7 +219,12 @@ GEMINI_API_KEY=your-key-here
 
 ```bash
 # Test Python imports
-python -c "import fastapi, uvicorn, google.generativeai; print('All imports successful!')"
+python -c "
+import fastapi
+import uvicorn
+import google.generativeai
+print('All imports successful!')
+"
 
 # Check server files
 ls server/

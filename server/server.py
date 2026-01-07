@@ -55,10 +55,16 @@ class RobotState:
         # Task scheduling and reminders
         self.scheduled_tasks = []
         self.reminders = []
-        # TTS voice preferences
-        self.tts_voice = os.getenv("TTS_VOICE", "en+f3")
-        self.tts_speed = int(os.getenv("TTS_SPEED", "150"))
-        self.tts_pitch = int(os.getenv("TTS_PITCH", "50"))
+        # TTS voice preferences with error handling
+        try:
+            self.tts_voice = os.getenv("TTS_VOICE", "en+f3")
+            self.tts_speed = int(os.getenv("TTS_SPEED", "150"))
+            self.tts_pitch = int(os.getenv("TTS_PITCH", "50"))
+        except ValueError as e:
+            logger.warning(f"Invalid TTS configuration in .env, using defaults: {e}")
+            self.tts_voice = "en+f3"
+            self.tts_speed = 150
+            self.tts_pitch = 50
 
 robot_state = RobotState()
 
@@ -800,14 +806,20 @@ async def update_tts_settings(data: Dict):
         updated['voice'] = robot_state.tts_voice
     
     if 'speed' in data:
-        speed = max(80, min(450, int(data['speed'])))
-        robot_state.tts_speed = speed
-        updated['speed'] = robot_state.tts_speed
+        try:
+            speed = max(80, min(450, int(data['speed'])))
+            robot_state.tts_speed = speed
+            updated['speed'] = robot_state.tts_speed
+        except (ValueError, TypeError) as e:
+            return {"status": "error", "message": f"Invalid speed value: {data['speed']}"}
     
     if 'pitch' in data:
-        pitch = max(0, min(99, int(data['pitch'])))
-        robot_state.tts_pitch = pitch
-        updated['pitch'] = robot_state.tts_pitch
+        try:
+            pitch = max(0, min(99, int(data['pitch'])))
+            robot_state.tts_pitch = pitch
+            updated['pitch'] = robot_state.tts_pitch
+        except (ValueError, TypeError) as e:
+            return {"status": "error", "message": f"Invalid pitch value: {data['pitch']}"}
     
     if updated:
         logger.info(f"TTS settings updated: {updated}")
