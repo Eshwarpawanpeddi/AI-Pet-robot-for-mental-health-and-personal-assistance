@@ -121,6 +121,82 @@
             background: #ef4444;
             color: white;
         }
+        
+        .voice-controls {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        
+        .voice-control-group {
+            margin-bottom: 15px;
+        }
+        
+        .voice-control-group label {
+            display: block;
+            color: #aaa;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        
+        .voice-select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 6px;
+            background: #2a2a2a;
+            color: white;
+            font-size: 14px;
+        }
+        
+        .voice-slider {
+            width: 100%;
+            margin: 5px 0;
+        }
+        
+        .slider-value {
+            color: #667eea;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .tts-input-group {
+            margin-top: 15px;
+        }
+        
+        .tts-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 6px;
+            background: #2a2a2a;
+            color: white;
+            font-size: 14px;
+            resize: vertical;
+            min-height: 60px;
+        }
+        
+        .tts-btn {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 6px;
+            background: #667eea;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .tts-btn:hover {
+            background: #5568d3;
+        }
+        
+        .tts-btn:active {
+            transform: scale(0.98);
+        }
     </style>
 </head>
 <body>
@@ -158,6 +234,43 @@
             <div class="section-title">🎤 Audio Controls</div>
             <button class="audio-btn idle" id="listenBtn" onclick="toggleListening()">🎤 Start Listening</button>
             <button class="audio-btn idle" id="speakBtn" onclick="toggleSpeaking()">🔊 Robot Speak</button>
+            
+            <div class="section-title">🎙️ Voice & TTS Controls</div>
+            <div class="voice-controls">
+                <div class="voice-control-group">
+                    <label for="voiceSelect">Voice:</label>
+                    <select id="voiceSelect" class="voice-select" onchange="updateVoiceSettings()">
+                        <option value="en">English Male (Default)</option>
+                        <option value="en+f1">English Female 1</option>
+                        <option value="en+f2">English Female 2</option>
+                        <option value="en+f3" selected>English Female 3 (Recommended)</option>
+                        <option value="en+f4">English Female 4</option>
+                        <option value="en+m1">English Male 1</option>
+                        <option value="en+m2">English Male 2</option>
+                        <option value="en+m3">English Male 3</option>
+                        <option value="en+m4">English Male 4 (Deep)</option>
+                        <option value="en+m7">English Male 7 (Very Deep)</option>
+                        <option value="en-us">American English</option>
+                        <option value="en-uk">British English</option>
+                        <option value="en-scottish">Scottish English</option>
+                    </select>
+                </div>
+                
+                <div class="voice-control-group">
+                    <label for="speedSlider">Speed: <span id="speedValue" class="slider-value">150</span> wpm</label>
+                    <input type="range" id="speedSlider" class="voice-slider" min="80" max="450" value="150" oninput="updateSpeedDisplay()">
+                </div>
+                
+                <div class="voice-control-group">
+                    <label for="pitchSlider">Pitch: <span id="pitchValue" class="slider-value">50</span></label>
+                    <input type="range" id="pitchSlider" class="voice-slider" min="0" max="99" value="50" oninput="updatePitchDisplay()">
+                </div>
+                
+                <div class="tts-input-group">
+                    <textarea id="ttsInput" class="tts-input" placeholder="Type text to speak..."></textarea>
+                    <button class="tts-btn" onclick="sendTTS()">🔊 Speak & Broadcast</button>
+                </div>
+            </div>
             
             <div class="section-title">🎮 Control Mode</div>
             <div class="mode-toggle">
@@ -364,8 +477,50 @@
                 // Display camera frame
                 const cameraView = document.getElementById('cameraView');
                 cameraView.innerHTML = `<img src="data:image/jpeg;base64,${data.frame}" alt="Camera Feed">`;
+            } else if (data.type === 'tts_output') {
+                // Play TTS audio on port 8000
+                playTTSAudio(data.text);
             }
         };
+        
+        // Web Speech API for TTS playback on port 8000
+        function playTTSAudio(text) {
+            if ('speechSynthesis' in window) {
+                // Cancel any ongoing speech
+                window.speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                
+                // Try to match the selected voice (Web Speech API has different voice IDs)
+                const voices = window.speechSynthesis.getVoices();
+                const voiceSelect = document.getElementById('voiceSelect').value;
+                
+                // Map espeak voice IDs to Web Speech API voices
+                if (voiceSelect.includes('f')) {
+                    // Female voice - find a female English voice
+                    const femaleVoice = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('female'));
+                    if (femaleVoice) utterance.voice = femaleVoice;
+                } else if (voiceSelect.includes('m')) {
+                    // Male voice - find a male English voice
+                    const maleVoice = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('male'));
+                    if (maleVoice) utterance.voice = maleVoice;
+                }
+                
+                // Set rate and pitch (Web Speech API uses different scales)
+                const speed = parseInt(document.getElementById('speedSlider').value);
+                const pitch = parseInt(document.getElementById('pitchSlider').value);
+                
+                utterance.rate = speed / 150; // Normalize to Web Speech API rate (0.1 to 10)
+                utterance.pitch = pitch / 50;  // Normalize to Web Speech API pitch (0 to 2)
+                
+                window.speechSynthesis.speak(utterance);
+                console.log(`Playing TTS: "${text}"`);
+            } else {
+                console.log('Speech synthesis not supported, displaying text:', text);
+                // Fallback: display the text
+                alert(`Robot says: ${text}`);
+            }
+        }
 
         function changeEmotion(emo) {
             eyes.emotion = emo;
@@ -374,6 +529,64 @@
 
         function sendText(txt) {
             ws.send(JSON.stringify({ type: 'text', text: txt }));
+        }
+        
+        function updateSpeedDisplay() {
+            const value = document.getElementById('speedSlider').value;
+            document.getElementById('speedValue').textContent = value;
+        }
+        
+        function updatePitchDisplay() {
+            const value = document.getElementById('pitchSlider').value;
+            document.getElementById('pitchValue').textContent = value;
+        }
+        
+        async function updateVoiceSettings() {
+            const voice = document.getElementById('voiceSelect').value;
+            const speed = document.getElementById('speedSlider').value;
+            const pitch = document.getElementById('pitchSlider').value;
+            
+            try {
+                const response = await fetch('/api/tts/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ voice, speed: parseInt(speed), pitch: parseInt(pitch) })
+                });
+                
+                const result = await response.json();
+                console.log('Voice settings updated:', result);
+            } catch (error) {
+                console.error('Failed to update voice settings:', error);
+            }
+        }
+        
+        async function sendTTS() {
+            const text = document.getElementById('ttsInput').value.trim();
+            if (!text) {
+                alert('Please enter text to speak');
+                return;
+            }
+            
+            const voice = document.getElementById('voiceSelect').value;
+            const speed = parseInt(document.getElementById('speedSlider').value);
+            const pitch = parseInt(document.getElementById('pitchSlider').value);
+            
+            try {
+                const response = await fetch('/api/speak', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, voice, speed, pitch })
+                });
+                
+                const result = await response.json();
+                console.log('TTS broadcast:', result);
+                
+                // Clear input
+                document.getElementById('ttsInput').value = '';
+            } catch (error) {
+                console.error('Failed to send TTS:', error);
+                alert('Failed to send TTS command');
+            }
         }
         
         function toggleCamera() {
