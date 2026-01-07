@@ -24,8 +24,8 @@ pydantic-settings==2.1.0
 # Async file handling for FastAPI
 aiofiles==23.2.1
 
-# Async HTTP client support
-aiohttp==3.9.1
+# Async HTTP client support (used in verify_ports.py)
+aiohttp>=3.13.3
 attrs==25.4.0
 frozenlist==1.8.0
 multidict==6.7.0

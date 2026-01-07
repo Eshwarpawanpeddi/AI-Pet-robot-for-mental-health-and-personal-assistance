@@ -1,4 +1,4 @@
-# FastAPI for backend REST API (Python 3.7+)
+# FastAPI for backend REST API
 fastapi==0.109.1
 
 # Uvicorn for running FastAPI apps
@@ -16,21 +16,22 @@ google-generativeai==0.8.3
 # dotenv for environment variable management
 python-dotenv==1.0.0
 
-# Pydantic compatibility for model validation (Python 3.7+)
+# Pydantic compatibility for model validation
 pydantic==2.5.3
 pydantic-settings==2.1.0
 
 # Async file handling for FastAPI
 aiofiles==23.2.1
 
-# Async HTTP client support (Python 3.7+)
-aiohttp==3.9.1
+# Async HTTP client support
+aiohttp>=3.13.3
 
-# Computer vision and ML for emotion detection
+# Computer vision library
 opencv-python==4.8.1.78
+
+# Machine learning for emotion detection
 tensorflow==2.15.0
 numpy==1.24.3
-sounddevice 
-scipy
+
 # YOLO object detection for autonomous navigation
 ultralytics==8.0.196

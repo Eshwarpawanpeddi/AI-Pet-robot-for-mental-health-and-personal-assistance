@@ -1,2 +1,5 @@
+# WebSocket client for ROS-Server bridge
 websockets>=10.0
-asyncio
+
+# Note: ROS packages (rospy, geometry_msgs, sensor_msgs, std_msgs, actionlib)
+# are provided by ROS installation and should not be installed via pip
