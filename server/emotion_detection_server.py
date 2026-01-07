@@ -598,6 +598,39 @@ async def get_emotion_response_api(emotion: str = "neutral"):
         'response': response
     }
 
+@app.post("/api/tts")
+async def receive_tts(data: dict):
+    """
+    Receive TTS broadcast from port 8000
+    Forwards TTS to all connected emotion detection clients
+    """
+    try:
+        # Broadcast to all connected clients
+        disconnected_clients = []
+        for client in emotion_state.clients:
+            try:
+                await client.send_json({
+                    'type': 'tts_output',
+                    'text': data.get('text', ''),
+                    'voice': data.get('voice', 'en+f3'),
+                    'speed': data.get('speed', 150),
+                    'pitch': data.get('pitch', 50)
+                })
+            except Exception as e:
+                logger.error(f"Failed to send TTS to emotion detection client: {e}")
+                disconnected_clients.append(client)
+        
+        # Clean up disconnected clients
+        for client in disconnected_clients:
+            if client in emotion_state.clients:
+                emotion_state.clients.remove(client)
+        
+        logger.info(f"TTS broadcast to {len(emotion_state.clients)} emotion detection clients: {data.get('text', '')}")
+        return {"status": "ok", "broadcast_to": len(emotion_state.clients)}
+    except Exception as e:
+        logger.error(f"Error in TTS broadcast: {e}")
+        return {"status": "error", "message": str(e)}
+
 if __name__ == "__main__":
     logger.info("=" * 60)
     logger.info("Emotion Detection Server Starting...")

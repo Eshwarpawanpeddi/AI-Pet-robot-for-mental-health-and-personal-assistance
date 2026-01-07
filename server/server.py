@@ -55,6 +55,10 @@ class RobotState:
         # Task scheduling and reminders
         self.scheduled_tasks = []
         self.reminders = []
+        # TTS voice preferences
+        self.tts_voice = os.getenv("TTS_VOICE", "en+f3")
+        self.tts_speed = int(os.getenv("TTS_SPEED", "150"))
+        self.tts_pitch = int(os.getenv("TTS_PITCH", "50"))
 
 robot_state = RobotState()
 
@@ -395,12 +399,8 @@ async def handle_text_command(data: Dict):
             robot_state.last_transcript = f"User: {text}\nRobot: {response_text}"
             await sync_emotion_to_display(robot_state.emotion)
             
-            # Send speech to Raspberry Pi if enabled
-            if robot_state.raspberry_pi_client:
-                await robot_state.raspberry_pi_client.send_json({
-                    "type": "speak",
-                    "text": response_text
-                })
+            # Broadcast speech to all ports and devices
+            await broadcast_tts_to_all_ports(response_text)
         
         robot_state.is_speaking = False
     elif not robot_state.gemini_enabled_port_8000:
@@ -444,6 +444,92 @@ async def sync_emotion_to_display(emotion: str):
                     logger.debug(f"Emotion synced to display server: {emotion}")
     except Exception as e:
         logger.debug(f"Could not sync to emotion display server: {e}")
+
+async def broadcast_tts_to_all_ports(text: str, voice: str = None, speed: int = None, pitch: int = None):
+    """
+    Broadcast TTS (text-to-speech) to all connected ports and devices
+    - Sends to Raspberry Pi for hardware TTS output
+    - Sends to emotion detection server (port 9999)
+    - Sends to mobile web server (port 3000)
+    - Sends to emotion display server (port 10000)
+    - Broadcasts to all connected WebSocket clients on port 8000
+    """
+    tts_message = {
+        "type": "speak",
+        "text": text
+    }
+    
+    # Add voice parameters using defaults from robot_state if not provided
+    tts_message['voice'] = voice or robot_state.tts_voice
+    tts_message['speed'] = speed or robot_state.tts_speed
+    tts_message['pitch'] = pitch or robot_state.tts_pitch
+    
+    # Send to Raspberry Pi (hardware speaker)
+    if robot_state.raspberry_pi_client:
+        try:
+            await robot_state.raspberry_pi_client.send_json(tts_message)
+            logger.info(f"TTS sent to Raspberry Pi: {text}")
+        except Exception as e:
+            logger.error(f"Failed to send TTS to Raspberry Pi: {e}")
+    
+    # Broadcast to all connected WebSocket clients on port 8000
+    disconnected_clients = []
+    for client in robot_state.connected_clients:
+        try:
+            await client.send_json({
+                'type': 'tts_output',
+                'text': text,
+                'voice': tts_message['voice'],
+                'speed': tts_message['speed'],
+                'pitch': tts_message['pitch']
+            })
+        except Exception as e:
+            logger.debug(f"Failed to send TTS to client: {e}")
+            disconnected_clients.append(client)
+    
+    # Clean up disconnected clients
+    for client in disconnected_clients:
+        if client in robot_state.connected_clients:
+            robot_state.connected_clients.remove(client)
+    
+    # Send to emotion detection server (port 9999)
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                'http://localhost:9999/api/tts',
+                json=tts_message,
+                timeout=aiohttp.ClientTimeout(total=1)
+            ) as resp:
+                if resp.status == 200:
+                    logger.debug(f"TTS sent to emotion detection server (9999)")
+    except Exception as e:
+        logger.debug(f"Could not send TTS to emotion detection server: {e}")
+    
+    # Send to emotion display server (port 10000)
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                'http://localhost:10000/api/tts',
+                json=tts_message,
+                timeout=aiohttp.ClientTimeout(total=1)
+            ) as resp:
+                if resp.status == 200:
+                    logger.debug(f"TTS sent to emotion display server (10000)")
+    except Exception as e:
+        logger.debug(f"Could not send TTS to emotion display server: {e}")
+    
+    # Send to mobile web server (port 3000)
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                'http://localhost:3000/api/tts',
+                json=tts_message,
+                timeout=aiohttp.ClientTimeout(total=1)
+            ) as resp:
+                if resp.status == 200:
+                    logger.debug(f"TTS sent to mobile web server (3000)")
+    except Exception as e:
+        logger.debug(f"Could not send TTS to mobile web server: {e}")
 
 def detect_emotion(text: str) -> str:
     """Detect emotion from text with enhanced mental health awareness"""
@@ -625,15 +711,117 @@ async def set_control_mode(data: Dict):
 
 @app.post("/api/speak")
 async def speak_command(data: Dict):
-    """Send text to be spoken by robot"""
+    """
+    Send text to be spoken by robot with optional voice customization
+    Voice input is received on port 8000 and broadcast to all ports
+    
+    Parameters:
+    - text (str): Text to speak (required)
+    - voice (str, optional): Voice type (e.g., 'en', 'en+f3', 'en+m3')
+    - speed (int, optional): Speech speed in words per minute (80-450)
+    - pitch (int, optional): Voice pitch (0-99)
+    
+    Examples:
+    - {"text": "Hello", "voice": "en+f3", "speed": 150, "pitch": 50}
+    - {"text": "Hello"} # Uses default voice settings
+    """
     text = data.get('text', '')
-    if text and robot_state.raspberry_pi_client:
-        await robot_state.raspberry_pi_client.send_json({
-            "type": "speak",
-            "text": text
-        })
-        return {"status": "ok", "text": text}
-    return {"status": "error", "message": "No text or Pi not connected"}
+    if text:
+        # Extract voice parameters
+        voice = data.get('voice')
+        speed = data.get('speed')
+        pitch = data.get('pitch')
+        
+        # Broadcast TTS to all ports and devices
+        await broadcast_tts_to_all_ports(text, voice=voice, speed=speed, pitch=pitch)
+        
+        return {
+            "status": "ok",
+            "text": text,
+            "broadcast": "all_ports",
+            "voice_params": {
+                "voice": voice or robot_state.tts_voice,
+                "speed": speed or robot_state.tts_speed,
+                "pitch": pitch or robot_state.tts_pitch
+            }
+        }
+    return {"status": "error", "message": "No text provided"}
+
+@app.get("/api/tts/voices")
+async def get_available_voices():
+    """
+    Get available TTS voices and current settings
+    Returns list of supported espeak voices and current configuration
+    """
+    available_voices = [
+        {"id": "en", "name": "English Male (Default)", "gender": "male", "description": "Standard English male voice"},
+        {"id": "en+f1", "name": "English Female 1", "gender": "female", "description": "Light female voice"},
+        {"id": "en+f2", "name": "English Female 2", "gender": "female", "description": "Medium female voice"},
+        {"id": "en+f3", "name": "English Female 3", "gender": "female", "description": "Standard female voice (recommended)"},
+        {"id": "en+f4", "name": "English Female 4", "gender": "female", "description": "Deeper female voice"},
+        {"id": "en+m1", "name": "English Male 1", "gender": "male", "description": "Light male voice"},
+        {"id": "en+m2", "name": "English Male 2", "gender": "male", "description": "Medium male voice"},
+        {"id": "en+m3", "name": "English Male 3", "gender": "male", "description": "Standard male voice"},
+        {"id": "en+m4", "name": "English Male 4", "gender": "male", "description": "Deep male voice"},
+        {"id": "en+m7", "name": "English Male 7", "gender": "male", "description": "Very deep male voice"},
+        {"id": "en-us", "name": "English US", "gender": "male", "description": "American English accent"},
+        {"id": "en-uk", "name": "English UK", "gender": "male", "description": "British English accent"},
+        {"id": "en-scottish", "name": "English Scottish", "gender": "male", "description": "Scottish English accent"}
+    ]
+    
+    return {
+        "available_voices": available_voices,
+        "current_settings": {
+            "voice": robot_state.tts_voice,
+            "speed": robot_state.tts_speed,
+            "pitch": robot_state.tts_pitch
+        },
+        "parameter_ranges": {
+            "speed": {"min": 80, "max": 450, "default": 150, "description": "Words per minute"},
+            "pitch": {"min": 0, "max": 99, "default": 50, "description": "Voice pitch"}
+        }
+    }
+
+@app.post("/api/tts/settings")
+async def update_tts_settings(data: Dict):
+    """
+    Update default TTS voice settings
+    These settings will be used for all future TTS requests unless overridden
+    
+    Parameters:
+    - voice (str, optional): Default voice ID
+    - speed (int, optional): Default speed (80-450)
+    - pitch (int, optional): Default pitch (0-99)
+    """
+    updated = {}
+    
+    if 'voice' in data:
+        robot_state.tts_voice = data['voice']
+        updated['voice'] = robot_state.tts_voice
+    
+    if 'speed' in data:
+        speed = max(80, min(450, int(data['speed'])))
+        robot_state.tts_speed = speed
+        updated['speed'] = robot_state.tts_speed
+    
+    if 'pitch' in data:
+        pitch = max(0, min(99, int(data['pitch'])))
+        robot_state.tts_pitch = pitch
+        updated['pitch'] = robot_state.tts_pitch
+    
+    if updated:
+        logger.info(f"TTS settings updated: {updated}")
+        return {
+            "status": "ok",
+            "updated": updated,
+            "current_settings": {
+                "voice": robot_state.tts_voice,
+                "speed": robot_state.tts_speed,
+                "pitch": robot_state.tts_pitch
+            }
+        }
+    
+    return {"status": "error", "message": "No valid parameters provided"}
 
 @app.get("/api/mental_health/insights")
 async def get_mental_health_insights():
