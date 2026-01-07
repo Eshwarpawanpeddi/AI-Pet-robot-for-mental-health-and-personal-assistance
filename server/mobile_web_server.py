@@ -447,6 +447,38 @@ async def root():
                 <strong id="controlMode">Manual</strong>
             </div>
         </div>
+        
+        <div class="control-section">
+            <h2>🎙️ Voice & TTS</h2>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-size: 14px;">Voice:</label>
+                <select id="voiceSelect" style="width: 100%; padding: 10px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: white; font-size: 14px;">
+                    <option value="en">English Male (Default)</option>
+                    <option value="en+f1">English Female 1</option>
+                    <option value="en+f2">English Female 2</option>
+                    <option value="en+f3" selected>English Female 3</option>
+                    <option value="en+f4">English Female 4</option>
+                    <option value="en+m1">English Male 1</option>
+                    <option value="en+m2">English Male 2</option>
+                    <option value="en+m3">English Male 3</option>
+                    <option value="en+m4">English Male 4 (Deep)</option>
+                    <option value="en+m7">English Male 7 (Very Deep)</option>
+                    <option value="en-us">American English</option>
+                    <option value="en-uk">British English</option>
+                    <option value="en-scottish">Scottish English</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-size: 14px;">Speed: <span id="ttsSpeedValue">150</span> wpm</label>
+                <input type="range" id="ttsSpeedSlider" min="80" max="450" value="150" style="width: 100%;" oninput="document.getElementById('ttsSpeedValue').textContent = this.value">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-size: 14px;">Pitch: <span id="ttsPitchValue">50</span></label>
+                <input type="range" id="ttsPitchSlider" min="0" max="99" value="50" style="width: 100%;" oninput="document.getElementById('ttsPitchValue').textContent = this.value">
+            </div>
+            <textarea id="ttsInput" placeholder="Type text to speak..." style="width: 100%; padding: 10px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: white; font-size: 14px; min-height: 80px; resize: vertical;"></textarea>
+            <button onclick="sendTTS()" style="width: 100%; padding: 15px; margin-top: 10px; border: none; border-radius: 8px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-size: 16px; font-weight: bold; cursor: pointer;">🔊 Speak & Broadcast</button>
+        </div>
     </div>
     
     <script>
@@ -480,8 +512,71 @@ async def root():
             } else if (data.type === 'camera_frame') {
                 const cameraView = document.getElementById('cameraView');
                 cameraView.innerHTML = `<img src="data:image/jpeg;base64,${data.frame}" alt="Camera">`;
+            } else if (data.type === 'tts_output') {
+                // Play TTS audio on port 3000
+                playTTSAudio(data.text);
             }
         };
+        
+        // Web Speech API for TTS playback on port 3000
+        function playTTSAudio(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                const voices = window.speechSynthesis.getVoices();
+                const voiceSelect = document.getElementById('voiceSelect').value;
+                
+                // Try to match voice
+                if (voiceSelect.includes('f')) {
+                    const femaleVoice = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('female'));
+                    if (femaleVoice) utterance.voice = femaleVoice;
+                } else if (voiceSelect.includes('m')) {
+                    const maleVoice = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('male'));
+                    if (maleVoice) utterance.voice = maleVoice;
+                }
+                
+                const speed = parseInt(document.getElementById('ttsSpeedSlider').value);
+                const pitch = parseInt(document.getElementById('ttsPitchSlider').value);
+                
+                utterance.rate = speed / 150;
+                utterance.pitch = pitch / 50;
+                
+                window.speechSynthesis.speak(utterance);
+                console.log(`Playing TTS on port 3000: "${text}"`);
+            }
+        }
+        
+        async function sendTTS() {
+            const text = document.getElementById('ttsInput').value.trim();
+            if (!text) {
+                alert('Please enter text to speak');
+                return;
+            }
+            
+            const voice = document.getElementById('voiceSelect').value;
+            const speed = parseInt(document.getElementById('ttsSpeedSlider').value);
+            const pitch = parseInt(document.getElementById('ttsPitchSlider').value);
+            
+            try {
+                // Send to primary server (port 8000) which will broadcast to all ports
+                const response = await fetch('http://localhost:8000/api/speak', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, voice, speed, pitch })
+                });
+                
+                if (response.ok) {
+                    console.log('TTS sent successfully');
+                    document.getElementById('ttsInput').value = '';
+                } else {
+                    console.error('Failed to send TTS');
+                }
+            } catch (error) {
+                console.error('Error sending TTS:', error);
+                alert('Failed to send TTS. Make sure port 8000 is running.');
+            }
+        }
         
         function move(direction) {
             const speed = Math.floor((currentSpeed / 100) * 255);
@@ -710,6 +805,39 @@ async def get_status():
         'mobile_clients': len(mobile_state.mobile_clients),
         'current_state': mobile_state.current_state
     }
+
+@app.post("/api/tts")
+async def receive_tts(data: dict):
+    """
+    Receive TTS broadcast from port 8000
+    Forwards TTS to all connected mobile clients for display/output
+    """
+    try:
+        # Broadcast to all connected mobile clients
+        disconnected_clients = []
+        for client in mobile_state.mobile_clients:
+            try:
+                await client.send_json({
+                    'type': 'tts_output',
+                    'text': data.get('text', ''),
+                    'voice': data.get('voice', 'en+f3'),
+                    'speed': data.get('speed', 150),
+                    'pitch': data.get('pitch', 50)
+                })
+            except Exception as e:
+                logger.error(f"Failed to send TTS to mobile client: {e}")
+                disconnected_clients.append(client)
+        
+        # Clean up disconnected clients
+        for client in disconnected_clients:
+            if client in mobile_state.mobile_clients:
+                mobile_state.mobile_clients.remove(client)
+        
+        logger.info(f"TTS broadcast to {len(mobile_state.mobile_clients)} mobile clients: {data.get('text', '')}")
+        return {"status": "ok", "broadcast_to": len(mobile_state.mobile_clients)}
+    except Exception as e:
+        logger.error(f"Error in TTS broadcast: {e}")
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     logger.info("=" * 60)

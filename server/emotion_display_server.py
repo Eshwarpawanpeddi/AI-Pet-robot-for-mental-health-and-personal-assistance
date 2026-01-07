@@ -370,6 +370,39 @@ async def get_emotion():
     """Get current emotion"""
     return {"emotion": display_state.emotion}
 
+@app.post("/api/tts")
+async def receive_tts(data: dict):
+    """
+    Receive TTS broadcast from port 8000
+    Forwards TTS to all connected emotion display clients
+    """
+    try:
+        # Broadcast to all connected display clients
+        disconnected_clients = []
+        for client in display_state.display_clients:
+            try:
+                await client.send_json({
+                    'type': 'tts_output',
+                    'text': data.get('text', ''),
+                    'voice': data.get('voice', 'en+f3'),
+                    'speed': data.get('speed', 150),
+                    'pitch': data.get('pitch', 50)
+                })
+            except Exception as e:
+                logger.error(f"Failed to send TTS to display client: {e}")
+                disconnected_clients.append(client)
+        
+        # Clean up disconnected clients
+        for client in disconnected_clients:
+            if client in display_state.display_clients:
+                display_state.display_clients.remove(client)
+        
+        logger.info(f"TTS broadcast to {len(display_state.display_clients)} display clients: {data.get('text', '')}")
+        return {"status": "ok", "broadcast_to": len(display_state.display_clients)}
+    except Exception as e:
+        logger.error(f"Error in TTS broadcast: {e}")
+        return {"status": "error", "message": str(e)}
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""

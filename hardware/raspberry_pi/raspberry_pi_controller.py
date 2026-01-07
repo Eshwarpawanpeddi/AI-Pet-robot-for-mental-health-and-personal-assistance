@@ -49,6 +49,14 @@ GPIO_I2S_DATA = 21
 AUDIO_OUTPUT_MODE = "default"  # Options: "default" (3.5mm jack), "gpio_pwm", "i2s"
 AUDIO_VOLUME = 80  # Volume percentage (0-100)
 
+# TTS Voice Configuration
+# Available espeak voices: en (default), en-us, en-uk, en-scottish, en+f1-f5 (female), en+m1-m7 (male)
+# Speed: 80-450 words per minute (default: 175)
+# Pitch: 0-99 (default: 50)
+TTS_VOICE = "en+f3"  # Options: "en" (male), "en+f3" (female), "en+m3" (male deep), etc.
+TTS_SPEED = 150  # Words per minute
+TTS_PITCH = 50  # Voice pitch (0-99)
+
 class Direction(Enum):
     STOP = 0
     FORWARD = 1
@@ -248,7 +256,12 @@ class RaspberryPiController:
             elif msg_type == "stop_camera":
                 await self.stop_camera_stream()
             elif msg_type == "speak":
-                await self.speak_text(data.get("text", ""))
+                # Extract voice parameters if provided
+                text = data.get("text", "")
+                voice = data.get("voice")  # Optional voice parameter
+                speed = data.get("speed")  # Optional speed parameter
+                pitch = data.get("pitch")  # Optional pitch parameter
+                await self.speak_text(text, voice=voice, speed=speed, pitch=pitch)
                 
         except json.JSONDecodeError as e:
             logger.error(f"JSON decode error: {e}")
@@ -330,24 +343,40 @@ class RaspberryPiController:
         except Exception as e:
             logger.error(f"Error playing audio: {e}")
     
-    async def speak_text(self, text: str):
-        """Text-to-speech on Raspberry Pi with audio output configuration"""
+    async def speak_text(self, text: str, voice: str = None, speed: int = None, pitch: int = None):
+        """
+        Text-to-speech on Raspberry Pi with audio output configuration
+        
+        Args:
+            text: Text to speak
+            voice: espeak voice (e.g., 'en', 'en+f3', 'en+m3'). Defaults to TTS_VOICE config
+            speed: Words per minute (80-450). Defaults to TTS_SPEED config
+            pitch: Voice pitch (0-99). Defaults to TTS_PITCH config
+        """
         try:
-            logger.info(f"Speaking: {text}")
+            # Use provided values or defaults from configuration
+            voice = voice or TTS_VOICE
+            speed = speed or TTS_SPEED
+            pitch = pitch or TTS_PITCH
+            
+            logger.info(f"Speaking: {text} [Voice: {voice}, Speed: {speed}, Pitch: {pitch}]")
+            
+            # Build espeak command with voice parameters
+            espeak_cmd = ['espeak', '-v', voice, '-s', str(speed), '-p', str(pitch), text]
             
             # Set audio output based on configuration
             if AUDIO_OUTPUT_MODE == "gpio_pwm":
                 # For GPIO PWM audio output (via transistor circuit)
                 # espeak can output to ALSA, which can be configured for GPIO
-                subprocess.Popen(['espeak', '-v', 'en+f3', '-s', '150', text])
+                subprocess.Popen(espeak_cmd)
             elif AUDIO_OUTPUT_MODE == "i2s":
                 # For I2S DAC modules (better quality)
                 # Requires I2S configuration in /boot/config.txt
-                subprocess.Popen(['espeak', '-v', 'en+f3', '-s', '150', text])
+                subprocess.Popen(espeak_cmd)
             else:
                 # Default: Use 3.5mm audio jack or HDMI
                 # Ensure audio output is set to headphones (not HDMI)
-                subprocess.Popen(['espeak', '-v', 'en+f3', '-s', '150', text])
+                subprocess.Popen(espeak_cmd)
             
             # Set volume using amixer
             subprocess.Popen(['amixer', 'set', 'Master', f'{AUDIO_VOLUME}%'])

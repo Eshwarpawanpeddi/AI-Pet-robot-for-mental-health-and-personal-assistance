@@ -23,6 +23,12 @@ ROBOT_NAME=MyPetRobot
 EMOTION_DETECTION_PORT=9999
 EMOTION_DETECTION_URL=http://localhost:9999
 
+# TTS Voice Configuration (Optional - for text-to-speech customization)
+# Available voices: en (male), en+f1-f5 (female), en+m1-m7 (male), en-us, en-uk, en-scottish
+TTS_VOICE=en+f3
+TTS_SPEED=150
+TTS_PITCH=50
+
 # Smart Home Integration (Optional)
 SMART_HOME_ENABLED=true
 # MQTT_BROKER_URL=mqtt://localhost:1883
