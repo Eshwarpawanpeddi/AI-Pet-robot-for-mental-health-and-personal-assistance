@@ -3,6 +3,7 @@
 Emotion Detection Server - Port 9999
 Real-time emotion detection from camera stream using emotion_model.h5
 Detects emotions from facial expressions and provides feedback via Gemini API
+Uses the same connection logic pattern as server.py for consistency.
 """
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,11 +17,24 @@ import numpy as np
 import base64
 from typing import Optional
 import os
-import tensorflow as tf
-from dotenv import load_dotenv
-import google.generativeai as genai
+import json
 
-load_dotenv()
+try:
+    import tensorflow as tf
+except ImportError:
+    tf = None
+    
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -44,17 +58,21 @@ class EmotionDetectionState:
         self.current_emotion = "neutral"
         self.emotion_history = []
         self.emotion_labels = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
+        self.is_connected = False
     
     async def load_models(self):
         """Load emotion detection model and face detector"""
         try:
             # Load emotion model
-            model_path = os.path.join(os.path.dirname(__file__), "..", "emotion_model.h5")
-            if os.path.exists(model_path):
-                self.emotion_model = tf.keras.models.load_model(model_path)
-                logger.info(f"Emotion model loaded successfully from {model_path}")
+            if tf is not None:
+                model_path = os.path.join(os.path.dirname(__file__), "..", "emotion_model.h5")
+                if os.path.exists(model_path):
+                    self.emotion_model = tf.keras.models.load_model(model_path)
+                    logger.info(f"Emotion model loaded successfully from {model_path}")
+                else:
+                    logger.warning(f"Emotion model not found at {model_path}")
             else:
-                logger.error(f"Emotion model not found at {model_path}")
+                logger.warning("TensorFlow not available - emotion model disabled")
             
             # Load face detector
             cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
@@ -62,7 +80,7 @@ class EmotionDetectionState:
             logger.info("Face cascade loaded successfully")
             
             # Initialize Gemini API for emotion-based responses
-            if GEMINI_API_KEY:
+            if GEMINI_API_KEY and genai is not None:
                 genai.configure(api_key=GEMINI_API_KEY)
                 self.gemini_model = genai.GenerativeModel(
                     model_name="gemini-1.5-flash",
@@ -76,34 +94,44 @@ class EmotionDetectionState:
                 )
                 logger.info("Gemini API initialized for emotion responses")
             else:
-                logger.warning("GEMINI_API_KEY not found - emotion responses disabled")
+                logger.warning("GEMINI_API_KEY not found or genai not available - emotion responses disabled")
                 
         except Exception as e:
             logger.error(f"Error loading models: {e}")
     
     async def connect_to_primary(self):
-        """Connect to primary control server for camera feed"""
-        import websockets
-        try:
-            logger.info("Connecting to primary server for camera feed...")
-            self.primary_ws = await websockets.connect(self.primary_ws_url)
-            logger.info("Connected to primary server")
+        """Connect to primary control server for camera feed with retry logic"""
+        while True:
+            try:
+                import websockets
+                logger.info(f"Connecting to primary server at {self.primary_ws_url}...")
+                self.primary_ws = await asyncio.wait_for(
+                    websockets.connect(self.primary_ws_url),
+                    timeout=10
+                )
+                self.is_connected = True
+                logger.info("✓ Connected to primary server (port 8000)")
+                
+                # Subscribe to camera feed
+                await self.primary_ws.send('{"type": "subscribe_camera"}')
+                
+                # Listen for camera frames
+                await self.listen_to_primary()
+                
+            except asyncio.TimeoutError:
+                logger.warning("Connection to primary server timed out, retrying in 5s...")
+            except Exception as e:
+                logger.warning(f"Failed to connect to primary server: {e}, retrying in 5s...")
             
-            # Subscribe to camera feed
-            await self.primary_ws.send('{"type": "subscribe_camera"}')
-            
-            # Start listening for camera frames
-            asyncio.create_task(self.listen_to_primary())
-        except Exception as e:
-            logger.error(f"Failed to connect to primary server: {e}")
+            self.is_connected = False
             self.primary_ws = None
+            await asyncio.sleep(5)
     
     async def listen_to_primary(self):
         """Listen for camera frames from primary server"""
         try:
             while self.primary_ws:
                 message = await self.primary_ws.recv()
-                import json
                 data = json.loads(message)
                 
                 if data.get('type') == MSG_TYPE_CAMERA_FRAME:
@@ -112,6 +140,7 @@ class EmotionDetectionState:
                     asyncio.create_task(self.process_frame())
         except Exception as e:
             logger.error(f"Error listening to primary: {e}")
+            self.is_connected = False
             self.primary_ws = None
     
     async def process_frame(self):
@@ -225,12 +254,17 @@ async def lifespan(app: FastAPI):
     # Load models
     await emotion_state.load_models()
     
-    # Connect to primary server
-    await emotion_state.connect_to_primary()
+    # Start connection task in background (with retry logic)
+    connection_task = asyncio.create_task(emotion_state.connect_to_primary())
     
     yield
     
     # Cleanup
+    connection_task.cancel()
+    try:
+        await connection_task
+    except asyncio.CancelledError:
+        pass
     if emotion_state.primary_ws:
         await emotion_state.primary_ws.close()
 

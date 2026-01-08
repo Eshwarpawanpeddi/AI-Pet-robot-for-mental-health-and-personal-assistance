@@ -77,10 +77,36 @@ class EmotionDisplayState:
     def __init__(self):
         self.emotion = "neutral"
         self.display_clients = []
+        self.emotion_history = []  # Track emotion changes over time
+        self.mood_analytics = {
+            'happy': 0,
+            'sad': 0,
+            'angry': 0,
+            'neutral': 0,
+            'fear': 0,
+            'surprise': 0,
+            'disgust': 0
+        }
+        self.total_updates = 0
     
     async def set_emotion(self, emotion: str):
         """Update emotion and broadcast to all connected clients"""
         self.emotion = emotion
+        self.total_updates += 1
+        
+        # Track emotion in history (keep last 100 entries)
+        from datetime import datetime
+        self.emotion_history.append({
+            'emotion': emotion,
+            'timestamp': datetime.now().isoformat()
+        })
+        if len(self.emotion_history) > 100:
+            self.emotion_history.pop(0)
+        
+        # Update mood analytics
+        if emotion in self.mood_analytics:
+            self.mood_analytics[emotion] += 1
+        
         logger.info(f"Emotion display updated to: {emotion}")
         await self.broadcast_emotion()
     
@@ -457,9 +483,229 @@ async def health_check():
         'clients': len(display_state.display_clients)
     }
 
+# ============================================================================
+# UNIQUE FEATURES FOR PORT 10000 - Emotion Analytics & Visualization
+# ============================================================================
+
+@app.get("/api/analytics")
+async def get_emotion_analytics():
+    """Get mood analytics - unique to port 10000"""
+    total = sum(display_state.mood_analytics.values())
+    percentages = {}
+    if total > 0:
+        percentages = {k: round(v / total * 100, 1) for k, v in display_state.mood_analytics.items()}
+    
+    # Calculate dominant mood
+    dominant_mood = max(display_state.mood_analytics, key=display_state.mood_analytics.get) if total > 0 else 'neutral'
+    
+    return {
+        'total_updates': display_state.total_updates,
+        'current_emotion': display_state.emotion,
+        'mood_counts': display_state.mood_analytics,
+        'mood_percentages': percentages,
+        'dominant_mood': dominant_mood,
+        'connected_displays': len(display_state.display_clients)
+    }
+
+@app.get("/api/history")
+async def get_emotion_history():
+    """Get emotion history timeline - unique to port 10000"""
+    return {
+        'current_emotion': display_state.emotion,
+        'history': display_state.emotion_history[-50:],  # Last 50 entries
+        'total_entries': len(display_state.emotion_history)
+    }
+
+@app.post("/api/analytics/reset")
+async def reset_analytics():
+    """Reset mood analytics - unique to port 10000"""
+    display_state.mood_analytics = {
+        'happy': 0,
+        'sad': 0,
+        'angry': 0,
+        'neutral': 0,
+        'fear': 0,
+        'surprise': 0,
+        'disgust': 0
+    }
+    display_state.emotion_history = []
+    display_state.total_updates = 0
+    logger.info("Emotion analytics reset")
+    return {"status": "ok", "message": "Analytics reset successfully"}
+
+@app.get("/dashboard")
+async def analytics_dashboard():
+    """Serve the mood analytics dashboard - unique to port 10000"""
+    return HTMLResponse(content="""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mood Analytics Dashboard - Port 10000</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: white;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            margin-bottom: 30px;
+        }
+        .header h1 { font-size: 32px; margin-bottom: 10px; }
+        .header .subtitle { color: #888; font-size: 14px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .card h2 { font-size: 18px; margin-bottom: 15px; color: #4ade80; }
+        .current-emotion {
+            text-align: center;
+            font-size: 80px;
+            padding: 20px;
+        }
+        .emotion-label { font-size: 24px; text-transform: capitalize; margin-top: 10px; }
+        .stat-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-value { font-weight: bold; color: #4ade80; }
+        .bar-chart { margin-top: 15px; }
+        .bar-row { display: flex; align-items: center; margin: 8px 0; }
+        .bar-label { width: 80px; font-size: 14px; }
+        .bar-container { flex: 1; height: 20px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 10px; transition: width 0.5s ease; }
+        .bar-value { width: 50px; text-align: right; font-size: 14px; }
+        .timeline { max-height: 300px; overflow-y: auto; }
+        .timeline-item { display: flex; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .timeline-time { width: 80px; font-size: 12px; color: #888; }
+        .timeline-emotion { text-transform: capitalize; }
+        .refresh-btn {
+            background: #4ade80;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            color: #1a1a2e;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        .refresh-btn:hover { background: #22c55e; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Mood Analytics Dashboard</h1>
+        <div class="subtitle">Port 10000 - Emotion Display & Analytics Server</div>
+    </div>
+    
+    <div class="grid">
+        <div class="card">
+            <h2>🎭 Current Emotion</h2>
+            <div class="current-emotion" id="emotionIcon">😐</div>
+            <div class="emotion-label" id="emotionLabel">Neutral</div>
+        </div>
+        
+        <div class="card">
+            <h2>📈 Statistics</h2>
+            <div class="stat-row"><span>Total Updates</span><span class="stat-value" id="totalUpdates">0</span></div>
+            <div class="stat-row"><span>Dominant Mood</span><span class="stat-value" id="dominantMood">-</span></div>
+            <div class="stat-row"><span>Connected Displays</span><span class="stat-value" id="connectedDisplays">0</span></div>
+        </div>
+        
+        <div class="card" style="grid-column: span 2;">
+            <h2>📊 Mood Distribution</h2>
+            <div class="bar-chart" id="moodChart"></div>
+        </div>
+        
+        <div class="card" style="grid-column: span 2;">
+            <h2>⏱️ Recent History</h2>
+            <div class="timeline" id="timeline"></div>
+            <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
+        </div>
+    </div>
+    
+    <script>
+        const emotionIcons = {
+            'happy': '😊', 'sad': '😢', 'angry': '😠', 'neutral': '😐',
+            'fear': '😨', 'surprise': '😲', 'disgust': '🤢'
+        };
+        const emotionColors = {
+            'happy': '#ffd700', 'sad': '#4a90e2', 'angry': '#ff5050', 'neutral': '#4ade80',
+            'fear': '#9b59b6', 'surprise': '#f39c12', 'disgust': '#27ae60'
+        };
+        
+        async function loadData() {
+            try {
+                const [analytics, history] = await Promise.all([
+                    fetch('/api/analytics').then(r => r.json()),
+                    fetch('/api/history').then(r => r.json())
+                ]);
+                
+                // Update current emotion
+                document.getElementById('emotionIcon').textContent = emotionIcons[analytics.current_emotion] || '😐';
+                document.getElementById('emotionLabel').textContent = analytics.current_emotion;
+                
+                // Update stats
+                document.getElementById('totalUpdates').textContent = analytics.total_updates;
+                document.getElementById('dominantMood').textContent = analytics.dominant_mood;
+                document.getElementById('connectedDisplays').textContent = analytics.connected_displays;
+                
+                // Update chart
+                const chartHtml = Object.entries(analytics.mood_percentages).map(([mood, pct]) => `
+                    <div class="bar-row">
+                        <div class="bar-label">${emotionIcons[mood] || ''} ${mood}</div>
+                        <div class="bar-container">
+                            <div class="bar-fill" style="width: ${pct}%; background: ${emotionColors[mood] || '#4ade80'}"></div>
+                        </div>
+                        <div class="bar-value">${pct}%</div>
+                    </div>
+                `).join('');
+                document.getElementById('moodChart').innerHTML = chartHtml;
+                
+                // Update timeline
+                const timelineHtml = history.history.slice(-20).reverse().map(item => `
+                    <div class="timeline-item">
+                        <div class="timeline-time">${new Date(item.timestamp).toLocaleTimeString()}</div>
+                        <div class="timeline-emotion">${emotionIcons[item.emotion] || ''} ${item.emotion}</div>
+                    </div>
+                `).join('');
+                document.getElementById('timeline').innerHTML = timelineHtml || '<div style="color: #888;">No history yet</div>';
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+            }
+        }
+        
+        // WebSocket for real-time updates
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}/ws/emotion_display`);
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'emotion_update') {
+                document.getElementById('emotionIcon').textContent = emotionIcons[data.emotion] || '😐';
+                document.getElementById('emotionLabel').textContent = data.emotion;
+                loadData(); // Refresh all data
+            }
+        };
+        
+        loadData();
+        setInterval(loadData, 10000); // Refresh every 10 seconds
+    </script>
+</body>
+</html>
+    """)
+
 if __name__ == "__main__":
     logger.info("=" * 60)
-    logger.info("Emotion Display Server Starting...")
+    logger.info("Emotion Display & Analytics Server Starting...")
     logger.info("=" * 60)
     logger.info("")
     logger.info("🎨 Server Configuration:")
@@ -467,15 +713,17 @@ if __name__ == "__main__":
     logger.info(f"   - Port: 10000")
     logger.info(f"   - Log File: {log_file}")
     logger.info("")
-    logger.info("🌐 Access the emotion display at:")
-    logger.info("   - http://localhost:10000")
+    logger.info("🌐 Access Points:")
+    logger.info("   - http://localhost:10000           → Emotion Display")
+    logger.info("   - http://localhost:10000/dashboard → Analytics Dashboard")
     logger.info("")
-    logger.info("📡 WebSocket Endpoint:")
-    logger.info("   - /ws/emotion_display → Display clients")
+    logger.info("📡 API Endpoints (Unique to Port 10000):")
+    logger.info("   - GET  /api/analytics  → Mood statistics")
+    logger.info("   - GET  /api/history    → Emotion timeline")
+    logger.info("   - POST /api/analytics/reset → Reset analytics")
     logger.info("")
-    logger.info("🔄 Emotion Updates:")
-    logger.info("   - Polls port 8000 for emotion state")
-    logger.info("   - POST /api/emotion to update directly")
+    logger.info("🔄 WebSocket:")
+    logger.info("   - /ws/emotion_display → Real-time emotion updates")
     logger.info("")
     logger.info("=" * 60)
     logger.info("")
