@@ -10,6 +10,13 @@ import time
 import requests
 from pathlib import Path
 
+# Configuration constants
+DEPENDENCY_CHECK_TIMEOUT = 10  # seconds
+SERVER_STARTUP_WAIT_TIME = 5  # seconds
+REQUEST_TIMEOUT = 5  # seconds
+MAX_OUTPUT_LENGTH = 500  # characters
+PROCESS_STOP_TIMEOUT = 5  # seconds
+
 class ServerTester:
     def __init__(self):
         self.base_dir = Path(__file__).parent
@@ -27,7 +34,7 @@ class ServerTester:
                 cwd=self.base_dir,
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=DEPENDENCY_CHECK_TIMEOUT
             )
             
             if result.returncode == 0:
@@ -70,27 +77,27 @@ class ServerTester:
             
             # Wait for server to start
             print("Waiting for server to start...")
-            time.sleep(5)
+            time.sleep(SERVER_STARTUP_WAIT_TIME)
             
             # Check if process is still running
             if process.poll() is not None:
                 stdout, stderr = process.communicate()
                 print(f"✗ Server exited unexpectedly")
-                print("STDOUT:", stdout[-500:] if len(stdout) > 500 else stdout)
-                print("STDERR:", stderr[-500:] if len(stderr) > 500 else stderr)
+                print("STDOUT:", stdout[-MAX_OUTPUT_LENGTH:] if len(stdout) > MAX_OUTPUT_LENGTH else stdout)
+                print("STDERR:", stderr[-MAX_OUTPUT_LENGTH:] if len(stderr) > MAX_OUTPUT_LENGTH else stderr)
                 self.results.append((test_name, False, "Server exited"))
                 return False
             
             # Test health endpoint
             print(f"Testing http://localhost:{port}/health...")
             try:
-                response = requests.get(f"http://localhost:{port}/health", timeout=5)
+                response = requests.get(f"http://localhost:{port}/health", timeout=REQUEST_TIMEOUT)
                 if response.status_code == 200:
                     print(f"✓ Health endpoint responded: {response.json()}")
                     
                     # Test main page
                     print(f"Testing http://localhost:{port}/...")
-                    response = requests.get(f"http://localhost:{port}/", timeout=5)
+                    response = requests.get(f"http://localhost:{port}/", timeout=REQUEST_TIMEOUT)
                     if response.status_code == 200:
                         print(f"✓ Main page accessible (returned {len(response.text)} bytes)")
                         print(f"✓ Server {test_name} is working correctly!")
@@ -125,7 +132,7 @@ class ServerTester:
                 print(f"Stopping server...")
                 process.terminate()
                 try:
-                    process.wait(timeout=5)
+                    process.wait(timeout=PROCESS_STOP_TIMEOUT)
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait()
