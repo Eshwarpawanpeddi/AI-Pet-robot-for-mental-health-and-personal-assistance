@@ -563,12 +563,14 @@ ROBOT_NAME=MyPetRobot
 ```
 
 **Important**: When accessing the servers from other devices on your network:
-1. Set `SERVER_HOST` to your server machine's IP address (e.g., `192.168.1.100`)
-2. Access the web interfaces using the same IP:
-   - Primary Control: `http://YOUR_IP:8000`
-   - Mobile Interface: `http://YOUR_IP:3000`
-   - Emotion Display: `http://YOUR_IP:10000`
-   - Emotion Detection: `http://YOUR_IP:9999`
+1. Find your server machine's IP address (e.g., `192.168.1.100`)
+2. Set `SERVER_HOST` in `.env` to that IP address: `SERVER_HOST=192.168.1.100`
+3. Restart the servers
+4. Access the web interfaces from any device using the same IP address:
+   - Primary Control: `http://192.168.1.100:8000` (replace with your actual IP)
+   - Mobile Interface: `http://192.168.1.100:3000`
+   - Emotion Display: `http://192.168.1.100:10000`
+   - Emotion Detection: `http://192.168.1.100:9999`
 
 ### Raspberry Pi Configuration
 

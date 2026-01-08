@@ -566,7 +566,7 @@ async def root():
             
             try {
                 // Send to primary server (port 8000) which will broadcast to all ports
-                // Use relative path to work with any host/IP
+                // Dynamically construct URL using current page's hostname to work with any IP
                 const protocol = window.location.protocol;
                 const hostname = window.location.hostname;
                 const response = await fetch(`${protocol}//${hostname}:8000/api/speak`, {
