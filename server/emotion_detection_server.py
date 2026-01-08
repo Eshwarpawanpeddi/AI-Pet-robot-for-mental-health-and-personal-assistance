@@ -18,6 +18,12 @@ import base64
 from typing import Optional
 import os
 import json
+from datetime import datetime
+
+try:
+    import websockets
+except ImportError:
+    websockets = None
 
 try:
     import tensorflow as tf
@@ -101,9 +107,12 @@ class EmotionDetectionState:
     
     async def connect_to_primary(self):
         """Connect to primary control server for camera feed with retry logic"""
+        if websockets is None:
+            logger.error("websockets library not available")
+            return
+            
         while True:
             try:
-                import websockets
                 logger.info(f"Connecting to primary server at {self.primary_ws_url}...")
                 self.primary_ws = await asyncio.wait_for(
                     websockets.connect(self.primary_ws_url),

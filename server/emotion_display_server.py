@@ -44,6 +44,7 @@ except ImportError as e:
 from contextlib import asynccontextmanager
 import asyncio
 import logging
+from datetime import datetime
 
 try:
     from dotenv import load_dotenv
@@ -95,7 +96,6 @@ class EmotionDisplayState:
         self.total_updates += 1
         
         # Track emotion in history (keep last 100 entries)
-        from datetime import datetime
         self.emotion_history.append({
             'emotion': emotion,
             'timestamp': datetime.now().isoformat()

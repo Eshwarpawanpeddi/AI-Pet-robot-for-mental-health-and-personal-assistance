@@ -18,6 +18,11 @@ import os
 import json
 
 try:
+    import websockets
+except ImportError:
+    websockets = None
+
+try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
@@ -41,9 +46,12 @@ class MobileControlState:
     
     async def connect_to_primary(self):
         """Connect to primary control server via WebSocket with retry logic"""
+        if websockets is None:
+            logger.error("websockets library not available")
+            return
+            
         while True:
             try:
-                import websockets
                 logger.info(f"Connecting to primary server at {self.primary_ws_url}...")
                 self.primary_ws = await asyncio.wait_for(
                     websockets.connect(self.primary_ws_url),
@@ -153,11 +161,14 @@ class MobileControlState:
                         json={'text': f"Emotion changed to {command.get('emotion', 'neutral')}"},
                         timeout=aiohttp.ClientTimeout(total=2)
                     ) as resp:
-                        pass
+                        if resp.status == 200:
+                            logger.debug(f"Emotion command sent successfully")
+                        else:
+                            logger.warning(f"Emotion command returned status {resp.status}")
                 elif cmd_type == 'start_camera' or cmd_type == 'stop_camera':
-                    logger.info(f"Camera command: {cmd_type}")
+                    logger.info(f"Camera command: {cmd_type} (WebSocket not available)")
                 elif cmd_type == 'move':
-                    logger.info(f"Move command: {command.get('direction')}")
+                    logger.info(f"Move command: {command.get('direction')} (WebSocket not available)")
                 
                 return True
         except Exception as e:

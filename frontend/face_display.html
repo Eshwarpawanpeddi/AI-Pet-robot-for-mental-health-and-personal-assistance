@@ -616,6 +616,8 @@
         connectWebSocket();
         
         // Movement Control Functions
+        const MAX_MOTOR_SPEED = 255;  // Maximum PWM value for motor control
+        
         function startMove(direction) {
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 console.error('WebSocket not connected');
@@ -623,7 +625,7 @@
             }
             currentDirection = direction;
             const speed = parseInt(document.getElementById('movementSpeedSlider').value);
-            const speedValue = Math.floor((speed / 100) * 255);
+            const speedValue = Math.floor((speed / 100) * MAX_MOTOR_SPEED);
             
             ws.send(JSON.stringify({ 
                 type: 'move', 
