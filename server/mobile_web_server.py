@@ -13,15 +13,21 @@ import logging
 import uvicorn
 import aiohttp
 from typing import Optional
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+SERVER_HOST = os.getenv("SERVER_HOST", "localhost")
+
 class MobileControlState:
     def __init__(self):
         self.mobile_clients = []
-        self.primary_server_url = "http://localhost:8000"
-        self.primary_ws_url = "ws://localhost:8000/ws/control"
+        self.primary_server_url = f"http://{SERVER_HOST}:8000"
+        self.primary_ws_url = f"ws://{SERVER_HOST}:8000/ws/control"
         self.primary_ws = None
         self.current_state = {}
         self.latest_camera_frame = None
@@ -560,7 +566,10 @@ async def root():
             
             try {
                 // Send to primary server (port 8000) which will broadcast to all ports
-                const response = await fetch('http://localhost:8000/api/speak', {
+                // Use relative path to work with any host/IP
+                const protocol = window.location.protocol;
+                const hostname = window.location.hostname;
+                const response = await fetch(`${protocol}//${hostname}:8000/api/speak`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text, voice, speed, pitch })

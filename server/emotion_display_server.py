@@ -14,6 +14,9 @@ import logging
 import os
 import uvicorn
 import aiohttp
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Configure logging to file and console
 log_dir = os.path.join(os.path.dirname(__file__), 'logs')
@@ -29,6 +32,8 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+SERVER_HOST = os.getenv("SERVER_HOST", "localhost")
 
 class EmotionDisplayState:
     def __init__(self):
@@ -80,7 +85,7 @@ async def lifespan(app: FastAPI):
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(
-                        'http://localhost:8000/api/state',
+                        f'http://{SERVER_HOST}:8000/api/state',
                         timeout=aiohttp.ClientTimeout(total=5)
                     ) as resp:
                         if resp.status == 200:
