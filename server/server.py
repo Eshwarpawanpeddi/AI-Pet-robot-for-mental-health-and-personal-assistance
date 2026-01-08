@@ -90,11 +90,11 @@ SERVER_HOST = os.getenv("SERVER_HOST", "localhost")
 
 class RobotState:
     def __init__(self):
-        self.emotion = "neutral"        # Robot face emotion
-        self.user_emotion = "neutral"   # Tracked sentiment of the user (deprecated in v2.2, use current_emotion)
+        self.emotion = "happy"        # Robot face emotion
+        self.user_emotion = "happy"   # Tracked sentiment of the user (deprecated in v2.2, use current_emotion)
         self.current_emotion = "unknown"  # Current detected user emotion from port 9999
-        self.is_listening = False
-        self.is_speaking = False
+        self.is_listening = True
+        self.is_speaking = True
         self.battery_level = 100
         self.connected_clients = []
         self.emotion_display_clients = []  # Clients connected to emotion display
@@ -116,6 +116,8 @@ class RobotState:
         # Port-specific Gemini control
         self.gemini_enabled_port_8000 = os.getenv("GEMINI_ENABLED_PORT_8000", "true").lower() == "true"
         self.gemini_enabled_port_3000 = os.getenv("GEMINI_ENABLED_PORT_3000", "true").lower() == "true"
+        self.gemini_enabled_port_9999 = os.getenv("GEMINI_ENABLED_PORT_9999", "true").lower() == "true"
+        
         # Task scheduling and reminders
         self.scheduled_tasks = []
         self.reminders = []
