@@ -23,6 +23,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+SERVER_HOST = os.getenv("SERVER_HOST", "localhost")
 
 class RobotState:
     def __init__(self):
@@ -337,7 +338,7 @@ async def query_emotion_detection() -> str:
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                'http://localhost:9999/api/emotion',
+                f'http://{SERVER_HOST}:9999/api/emotion',
                 timeout=aiohttp.ClientTimeout(total=2)
             ) as resp:
                 if resp.status == 200:
@@ -442,7 +443,7 @@ async def sync_emotion_to_display(emotion: str):
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                'http://localhost:10000/api/emotion',
+                f'http://{SERVER_HOST}:10000/api/emotion',
                 json={'emotion': emotion},
                 timeout=aiohttp.ClientTimeout(total=1)
             ) as resp:
@@ -502,7 +503,7 @@ async def broadcast_tts_to_all_ports(text: str, voice: str = None, speed: int = 
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                'http://localhost:9999/api/tts',
+                f'http://{SERVER_HOST}:9999/api/tts',
                 json=tts_message,
                 timeout=aiohttp.ClientTimeout(total=1)
             ) as resp:
@@ -515,7 +516,7 @@ async def broadcast_tts_to_all_ports(text: str, voice: str = None, speed: int = 
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                'http://localhost:10000/api/tts',
+                f'http://{SERVER_HOST}:10000/api/tts',
                 json=tts_message,
                 timeout=aiohttp.ClientTimeout(total=1)
             ) as resp:
@@ -528,7 +529,7 @@ async def broadcast_tts_to_all_ports(text: str, voice: str = None, speed: int = 
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                'http://localhost:3000/api/tts',
+                f'http://{SERVER_HOST}:3000/api/tts',
                 json=tts_message,
                 timeout=aiohttp.ClientTimeout(total=1)
             ) as resp:

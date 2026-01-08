@@ -25,6 +25,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+SERVER_HOST = os.getenv("SERVER_HOST", "localhost")
 
 # Message type constants
 MSG_TYPE_CAMERA_FRAME = "camera_frame"
@@ -36,8 +37,8 @@ class EmotionDetectionState:
         self.emotion_model = None
         self.face_cascade = None
         self.gemini_model = None
-        self.primary_server_url = "http://localhost:8000"
-        self.primary_ws_url = "ws://localhost:8000/ws/control"
+        self.primary_server_url = f"http://{SERVER_HOST}:8000"
+        self.primary_ws_url = f"ws://{SERVER_HOST}:8000/ws/control"
         self.primary_ws = None
         self.latest_camera_frame = None
         self.current_emotion = "neutral"

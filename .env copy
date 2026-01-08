@@ -5,6 +5,12 @@ GEMINI_API_KEY="your-api-key-here"
 # Server Configuration
 LOG_LEVEL=INFO
 
+# Server Host (for inter-server communication)
+# Use "localhost" for local development
+# Use "0.0.0.0" or specific IP address for remote access
+# Example: SERVER_HOST=192.168.1.100
+SERVER_HOST=localhost
+
 # Gemini Port Control (Optional - defaults to true)
 # Enable or disable Gemini AI on specific ports
 GEMINI_ENABLED_PORT_8000=true
