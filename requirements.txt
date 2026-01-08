@@ -41,5 +41,5 @@ opencv-python>=4.8.1.78
 tensorflow>=2.16.0
 numpy>=1.24.3
 
-# YOLO object detection for autonomous navigation (required for server.py)
+# YOLO object detection for autonomous navigation (required for autonomous_navigation.py)
 ultralytics>=8.0.196
