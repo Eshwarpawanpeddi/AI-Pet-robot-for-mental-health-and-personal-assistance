@@ -551,10 +551,24 @@ GEMINI_API_KEY=your-gemini-api-key-here
 # Server Configuration
 LOG_LEVEL=INFO
 
+# Server Host (for inter-server communication)
+# Use "localhost" for local development (default)
+# Use "0.0.0.0" or your machine's IP for remote access
+# Example: SERVER_HOST=192.168.1.100
+SERVER_HOST=localhost
+
 # Network Configuration
 RASPBERRY_PI_IP=192.168.1.100
 ROBOT_NAME=MyPetRobot
 ```
+
+**Important**: When accessing the servers from other devices on your network:
+1. Set `SERVER_HOST` to your server machine's IP address (e.g., `192.168.1.100`)
+2. Access the web interfaces using the same IP:
+   - Primary Control: `http://YOUR_IP:8000`
+   - Mobile Interface: `http://YOUR_IP:3000`
+   - Emotion Display: `http://YOUR_IP:10000`
+   - Emotion Detection: `http://YOUR_IP:9999`
 
 ### Raspberry Pi Configuration
 
@@ -602,6 +616,34 @@ controller.stop()
 - Check if Gemini API key is set correctly
 - Ensure port 8000 is not in use
 - Check logs: `docker-compose logs robot-server`
+
+### Can't Access Server from Other Devices (IP Address Not Working)
+
+If the server shows "running" but you can't access it via IP address from other devices:
+
+1. **Set SERVER_HOST in .env file**:
+   ```bash
+   # Find your machine's IP address
+   # Linux/Mac: ifconfig or ip addr
+   # Windows: ipconfig
+   
+   # Edit .env file and set:
+   SERVER_HOST=192.168.1.100  # Use your actual IP
+   ```
+
+2. **Restart all servers** after changing SERVER_HOST:
+   ```bash
+   cd server
+   python launch_all.py
+   ```
+
+3. **Access using the same IP**:
+   - `http://192.168.1.100:8000` (Primary Control)
+   - `http://192.168.1.100:3000` (Mobile Interface)
+   - `http://192.168.1.100:10000` (Emotion Display)
+   - `http://192.168.1.100:9999` (Emotion Detection)
+
+4. **Check firewall settings**: Ensure ports 8000, 3000, 9999, and 10000 are allowed
 
 ### Raspberry Pi Not Connecting
 
