@@ -32,3 +32,14 @@ multidict==6.7.0
 yarl==1.22.0
 aiosignal==1.4.0
 propcache==0.4.1
+
+# Computer vision library (required for emotion_detection_server.py)
+opencv-python>=4.8.1.78
+
+# Machine learning for emotion detection (required for emotion_detection_server.py)
+# Note: TensorFlow 2.15 doesn't support Python 3.12+, using 2.16+ for compatibility
+tensorflow>=2.16.0
+numpy>=1.24.3
+
+# YOLO object detection for autonomous navigation (required for server.py)
+ultralytics>=8.0.196
