@@ -19,6 +19,51 @@ class RobotLauncher:
     def __init__(self):
         self.processes = []
         self.base_dir = Path(__file__).parent.parent
+    
+    def check_dependencies(self):
+        """Check if required dependencies are installed"""
+        print("\n" + "="*70)
+        print("Checking Dependencies...")
+        print("="*70 + "\n")
+        
+        try:
+            # Try to import the dependency checker
+            sys.path.insert(0, str(self.base_dir / "server"))
+            from check_dependencies import check_dependency
+            
+            # Check core dependencies
+            missing = []
+            required_packages = [
+                ('fastapi', 'FastAPI'),
+                ('uvicorn', 'Uvicorn'),
+                ('aiohttp', 'aiohttp'),
+                ('dotenv', 'python-dotenv'),
+            ]
+            
+            for module_name, package_name in required_packages:
+                if not check_dependency(module_name):
+                    missing.append(package_name)
+            
+            if missing:
+                print("✗ Missing required dependencies:")
+                for pkg in missing:
+                    print(f"  - {pkg}")
+                print("\nTo install missing dependencies, run:")
+                print("  pip3 install " + " ".join(missing))
+                print("\nOr install all dependencies:")
+                print("  pip3 install -r server/requirements.txt")
+                print("\nFor a detailed dependency check, run:")
+                print("  python3 server/check_dependencies.py")
+                print()
+                return False
+            else:
+                print("✓ All core dependencies are installed")
+                return True
+                
+        except Exception as e:
+            print(f"⚠️  Could not check dependencies: {e}")
+            print("Proceeding with server startup...")
+            return True  # Proceed anyway, servers will handle errors
         
     def cleanup(self, signum=None, frame=None):
         """Clean up all processes"""
@@ -195,6 +240,14 @@ class RobotLauncher:
         print("AI Pet Robot - Integrated Launcher (Multi-Port)")
         print("=" * 70)
         print(f"\nMode: {mode.upper()}\n")
+        
+        # Check dependencies before starting
+        if not self.check_dependencies():
+            print("\n❌ Cannot start servers due to missing dependencies.")
+            print("Please install the required packages and try again.\n")
+            sys.exit(1)
+        
+        print()  # Extra line for readability
         
         if mode == "servers":
             # Start all three web servers

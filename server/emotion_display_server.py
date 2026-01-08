@@ -4,17 +4,55 @@ Emotion Display Server - Port 10000
 Dedicated server for displaying robot emotions/animated face.
 Receives emotion updates from the primary control server (port 8000).
 """
-from fastapi import FastAPI, WebSocket
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+
+import sys
+import os
+
+# Check critical dependencies before importing
+try:
+    from fastapi import FastAPI, WebSocket
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse, HTMLResponse
+except ImportError as e:
+    print("\n" + "="*70)
+    print("ERROR: Missing required dependencies for Emotion Display Server")
+    print("="*70)
+    print(f"\nMissing module: {e.name if hasattr(e, 'name') else 'unknown'}")
+    print("\nTo install required dependencies, run:")
+    print("  pip3 install fastapi uvicorn aiohttp python-dotenv")
+    print("\nOr install all dependencies:")
+    print("  pip3 install -r requirements.txt")
+    print("\nFor a complete dependency check, run:")
+    print("  python3 check_dependencies.py 10000")
+    print("="*70 + "\n")
+    sys.exit(1)
+
+try:
+    import uvicorn
+    import aiohttp
+except ImportError as e:
+    print("\n" + "="*70)
+    print("ERROR: Missing required dependencies for Emotion Display Server")
+    print("="*70)
+    print(f"\nMissing module: {e.name if hasattr(e, 'name') else 'unknown'}")
+    print("\nTo install required dependencies, run:")
+    print("  pip3 install uvicorn aiohttp")
+    print("="*70 + "\n")
+    sys.exit(1)
+
 from contextlib import asynccontextmanager
 import asyncio
 import logging
-import os
-import uvicorn
-import aiohttp
-from dotenv import load_dotenv
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    print("Warning: python-dotenv not installed. Environment variables must be set manually.")
+    print("Install with: pip3 install python-dotenv")
+    # Define a no-op load_dotenv function
+    def load_dotenv():
+        pass
 
 load_dotenv()
 

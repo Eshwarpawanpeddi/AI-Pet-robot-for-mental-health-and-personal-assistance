@@ -1,22 +1,85 @@
-from fastapi import FastAPI, WebSocket
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+#!/usr/bin/env python3
+"""
+AI Pet Robot - Primary Control Server (Port 8000)
+Handles robot control, camera, AI integration, and WebSocket connections.
+"""
+
+import sys
+import os
+
+# Check critical dependencies before importing
+try:
+    from fastapi import FastAPI, WebSocket
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+except ImportError as e:
+    print("\n" + "="*70)
+    print("ERROR: Missing required dependencies for Primary Control Server")
+    print("="*70)
+    print(f"\nMissing module: {e.name if hasattr(e, 'name') else 'unknown'}")
+    print("\nTo install required dependencies, run:")
+    print("  pip3 install fastapi uvicorn aiohttp python-dotenv")
+    print("\nOr install all dependencies:")
+    print("  pip3 install -r requirements.txt")
+    print("\nFor a complete dependency check, run:")
+    print("  python3 check_dependencies.py 8000")
+    print("="*70 + "\n")
+    sys.exit(1)
+
+try:
+    import uvicorn
+    import aiohttp
+except ImportError as e:
+    print("\n" + "="*70)
+    print("ERROR: Missing required dependencies for Primary Control Server")
+    print("="*70)
+    print(f"\nMissing module: {e.name if hasattr(e, 'name') else 'unknown'}")
+    print("\nTo install required dependencies, run:")
+    print("  pip3 install uvicorn aiohttp")
+    print("="*70 + "\n")
+    sys.exit(1)
+
 from contextlib import asynccontextmanager
 import asyncio
 import logging
-import os
 import uuid
 from typing import Dict, Optional
 from datetime import datetime
-from dotenv import load_dotenv
-import google.generativeai as genai
-import uvicorn
-import aiohttp
-from gemini_integration import GeminiMultimodalIntegration
-from camera_stream_manager import camera_stream_manager
-from autonomous_navigation import autonomous_navigator
-from smart_home_integration import smart_home, register_example_devices
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    print("Warning: python-dotenv not installed. Environment variables must be set manually.")
+    print("Install with: pip3 install python-dotenv")
+    # Define a no-op load_dotenv function
+    def load_dotenv():
+        pass
+
+try:
+    import google.generativeai as genai
+except ImportError:
+    print("Warning: google-generativeai not installed. AI features will be disabled.")
+    print("Install with: pip3 install google-generativeai")
+    genai = None
+
+try:
+    from gemini_integration import GeminiMultimodalIntegration
+    from camera_stream_manager import camera_stream_manager
+    from autonomous_navigation import autonomous_navigator
+    from smart_home_integration import smart_home, register_example_devices
+except ImportError as e:
+    print(f"\n" + "="*70)
+    print("ERROR: Missing local module dependencies")
+    print("="*70)
+    print(f"\nFailed to import: {e}")
+    print("\nThis usually means missing packages like:")
+    print("  - numpy (pip3 install numpy)")
+    print("  - opencv-python (pip3 install opencv-python)")
+    print("\nRun the dependency checker:")
+    print("  python3 check_dependencies.py 8000")
+    print("="*70 + "\n")
+    sys.exit(1)
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
