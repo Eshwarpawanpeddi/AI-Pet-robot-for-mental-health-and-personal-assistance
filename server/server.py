@@ -673,6 +673,11 @@ async def broadcast_state():
 
 @app.get("/")
 async def root():
+    """Serve the full control panel (camera, audio, movement controls)"""
+    return FileResponse(os.path.join(frontend_dir, "face_display.html"))
+
+@app.get("/display")
+async def emotion_display():
     """Serve the emotion display page (emotion-only, no controls)"""
     emotion_display_path = os.path.join(frontend_dir, "emotion_display.html")
     if os.path.exists(emotion_display_path):
@@ -682,7 +687,7 @@ async def root():
 
 @app.get("/control")
 async def control_panel():
-    """Serve the full control panel with camera, audio controls, etc."""
+    """Alias: Serve the full control panel with camera, audio controls, etc."""
     return FileResponse(os.path.join(frontend_dir, "face_display.html"))
 
 @app.get("/health")

@@ -11,6 +11,14 @@ from datetime import datetime
 import base64
 import io
 import subprocess
+import os
+
+# Try to load environment variables
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 # Configure logging
 logging.basicConfig(
@@ -19,9 +27,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Server Configuration
-SERVER_URL = "ws://10.44.35.29:8000/ws/raspberry_pi"
+# Server Configuration - Use environment variable or default to localhost
+SERVER_HOST = os.getenv("SERVER_HOST", "localhost")
+SERVER_PORT = os.getenv("SERVER_PORT", "8000")
+SERVER_URL = f"ws://{SERVER_HOST}:{SERVER_PORT}/ws/raspberry_pi"
 RECONNECT_DELAY = 5
+
+logger.info(f"Raspberry Pi Controller will connect to: {SERVER_URL}")
 
 # Motor Driver GPIO Pin Definitions (1 x L298N Driver - Parallel Wiring)
 # Left Motors (Front & Rear) connected to OUT1/OUT2

@@ -122,6 +122,72 @@
             color: white;
         }
         
+        .connection-status.reconnecting {
+            background: #f59e0b;
+            color: white;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        /* Movement Control Styles */
+        .movement-controls {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        
+        .direction-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            max-width: 180px;
+            margin: 0 auto;
+        }
+        
+        .direction-btn {
+            aspect-ratio: 1;
+            border: none;
+            border-radius: 10px;
+            background: #333;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .direction-btn:hover {
+            background: #444;
+        }
+        
+        .direction-btn:active, .direction-btn.active {
+            background: #667eea;
+            transform: scale(0.95);
+        }
+        
+        .direction-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        
+        .speed-control {
+            margin-top: 15px;
+        }
+        
+        .speed-control label {
+            color: #aaa;
+            font-size: 12px;
+        }
+        
+        .speed-slider {
+            width: 100%;
+            margin-top: 5px;
+        }
+        
         .voice-controls {
             background: rgba(255, 255, 255, 0.05);
             padding: 15px;
@@ -224,6 +290,47 @@
         
         <div class="right-panel">
             <div class="connection-status" id="connectionStatus">Connecting...</div>
+            
+            <div class="section-title">🎮 Movement Controls</div>
+            <div class="movement-controls">
+                <div class="direction-pad">
+                    <div></div>
+                    <button class="direction-btn" id="btnForward" 
+                            onmousedown="startMove('forward')" 
+                            onmouseup="stopMove()" 
+                            onmouseleave="stopMove()"
+                            ontouchstart="startMove('forward')" 
+                            ontouchend="stopMove()">⬆️</button>
+                    <div></div>
+                    <button class="direction-btn" id="btnLeft"
+                            onmousedown="startMove('left')" 
+                            onmouseup="stopMove()" 
+                            onmouseleave="stopMove()"
+                            ontouchstart="startMove('left')" 
+                            ontouchend="stopMove()">⬅️</button>
+                    <button class="direction-btn" onclick="stopMove()">⏹️</button>
+                    <button class="direction-btn" id="btnRight"
+                            onmousedown="startMove('right')" 
+                            onmouseup="stopMove()" 
+                            onmouseleave="stopMove()"
+                            ontouchstart="startMove('right')" 
+                            ontouchend="stopMove()">➡️</button>
+                    <div></div>
+                    <button class="direction-btn" id="btnBackward"
+                            onmousedown="startMove('backward')" 
+                            onmouseup="stopMove()" 
+                            onmouseleave="stopMove()"
+                            ontouchstart="startMove('backward')" 
+                            ontouchend="stopMove()">⬇️</button>
+                    <div></div>
+                </div>
+                <div class="speed-control">
+                    <label>Speed: <span id="movementSpeedValue">75</span>%</label>
+                    <input type="range" class="speed-slider" id="movementSpeedSlider" 
+                           min="0" max="100" value="75" 
+                           oninput="document.getElementById('movementSpeedValue').textContent = this.value">
+                </div>
+            </div>
             
             <div class="section-title">📹 Camera View</div>
             <div class="camera-view" id="cameraView">
@@ -443,45 +550,140 @@
         let cameraActive = false;
         let isListening = false;
         let isSpeaking = false;
-
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${protocol}//${window.location.host}/ws/control`);
+        let currentDirection = null;
+        let ws = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 10;
         
-        ws.onopen = () => {
-            document.getElementById('connectionStatus').className = 'connection-status connected';
-            document.getElementById('connectionStatus').textContent = '✓ Connected to Server';
-            ws.send(JSON.stringify({ type: 'subscribe_camera' }));
-        };
-        
-        ws.onclose = () => {
-            document.getElementById('connectionStatus').className = 'connection-status disconnected';
-            document.getElementById('connectionStatus').textContent = '✗ Disconnected';
-        };
-
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.type === 'state') {
-                const state = data.data;
-                eyes.emotion = state.emotion;
-                document.getElementById('userEmotion').textContent = state.user_emotion;
-                document.getElementById('robotEmotion').textContent = state.emotion;
-                document.getElementById('batteryLevel').textContent = state.battery_level;
-                document.getElementById('controlMode').textContent = state.control_mode || 'Manual';
+        // WebSocket connection with reconnection logic
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws/control`);
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                reconnectAttempts = 0;
+                document.getElementById('connectionStatus').className = 'connection-status connected';
+                document.getElementById('connectionStatus').textContent = '✓ Connected to Server';
+                ws.send(JSON.stringify({ type: 'subscribe_camera' }));
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                document.getElementById('connectionStatus').className = 'connection-status disconnected';
+                document.getElementById('connectionStatus').textContent = '✗ Disconnected';
                 
-                // Update connection status
-                if (state.raspberry_pi_connected) {
-                    document.getElementById('connectionStatus').className = 'connection-status connected';
-                    document.getElementById('connectionStatus').textContent = '✓ Connected - Pi Online';
+                // Attempt reconnection
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++;
+                    document.getElementById('connectionStatus').className = 'connection-status reconnecting';
+                    document.getElementById('connectionStatus').textContent = `Reconnecting... (${reconnectAttempts}/${maxReconnectAttempts})`;
+                    setTimeout(connectWebSocket, 2000);
                 }
-            } else if (data.type === 'camera_frame') {
-                // Display camera frame
-                const cameraView = document.getElementById('cameraView');
-                cameraView.innerHTML = `<img src="data:image/jpeg;base64,${data.frame}" alt="Camera Feed">`;
-            } else if (data.type === 'tts_output') {
-                // Play TTS audio on port 8000
-                playTTSAudio(data.text);
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'state') {
+                    const state = data.data;
+                    eyes.emotion = state.emotion;
+                    document.getElementById('userEmotion').textContent = state.user_emotion || 'Neutral';
+                    document.getElementById('robotEmotion').textContent = state.emotion || 'Neutral';
+                    document.getElementById('batteryLevel').textContent = state.battery_level || 100;
+                    document.getElementById('controlMode').textContent = state.control_mode || 'Manual';
+                    
+                    // Update connection status
+                    if (state.raspberry_pi_connected) {
+                        document.getElementById('connectionStatus').className = 'connection-status connected';
+                        document.getElementById('connectionStatus').textContent = '✓ Connected - Pi Online';
+                    }
+                } else if (data.type === 'camera_frame') {
+                    // Display camera frame
+                    const cameraView = document.getElementById('cameraView');
+                    cameraView.innerHTML = `<img src="data:image/jpeg;base64,${data.frame}" alt="Camera Feed">`;
+                } else if (data.type === 'tts_output') {
+                    // Play TTS audio on port 8000
+                    playTTSAudio(data.text);
+                }
+            };
+        }
+        
+        // Initialize WebSocket connection
+        connectWebSocket();
+        
+        // Movement Control Functions
+        const MAX_MOTOR_SPEED = 255;  // Maximum PWM value for motor control
+        
+        function startMove(direction) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                console.error('WebSocket not connected');
+                return;
             }
-        };
+            currentDirection = direction;
+            const speed = parseInt(document.getElementById('movementSpeedSlider').value);
+            const speedValue = Math.floor((speed / 100) * MAX_MOTOR_SPEED);
+            
+            ws.send(JSON.stringify({ 
+                type: 'move', 
+                direction: direction, 
+                speed: speedValue 
+            }));
+            
+            // Visual feedback
+            document.querySelectorAll('.direction-btn').forEach(btn => btn.classList.remove('active'));
+            const btnMap = {
+                'forward': 'btnForward',
+                'backward': 'btnBackward', 
+                'left': 'btnLeft',
+                'right': 'btnRight'
+            };
+            if (btnMap[direction]) {
+                document.getElementById(btnMap[direction]).classList.add('active');
+            }
+            console.log(`Move: ${direction} at speed ${speedValue}`);
+        }
+        
+        function stopMove() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            
+            currentDirection = null;
+            ws.send(JSON.stringify({ 
+                type: 'move', 
+                direction: 'stop', 
+                speed: 0 
+            }));
+            
+            // Remove visual feedback
+            document.querySelectorAll('.direction-btn').forEach(btn => btn.classList.remove('active'));
+            console.log('Move: stop');
+        }
+        
+        // Keyboard controls (WASD)
+        document.addEventListener('keydown', (e) => {
+            if (e.repeat || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT') return;
+            
+            const keyMap = {
+                'w': 'forward', 'W': 'forward', 'ArrowUp': 'forward',
+                's': 'backward', 'S': 'backward', 'ArrowDown': 'backward',
+                'a': 'left', 'A': 'left', 'ArrowLeft': 'left',
+                'd': 'right', 'D': 'right', 'ArrowRight': 'right'
+            };
+            
+            if (keyMap[e.key] && keyMap[e.key] !== currentDirection) {
+                startMove(keyMap[e.key]);
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            const keyMap = ['w', 'W', 'a', 'A', 's', 'S', 'd', 'D', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+            if (keyMap.includes(e.key)) {
+                stopMove();
+            }
+        });
         
         // Web Speech API for TTS playback on port 8000
         function playTTSAudio(text) {

@@ -3,6 +3,7 @@
 Mobile Web Control Server - Port 3000
 Mobile-friendly web-based control interface for basic robot movement,
 camera view, and emotion changes. Communicates with primary server (port 8000).
+Uses the same connection logic pattern as server.py for consistency.
 """
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,9 +15,18 @@ import uvicorn
 import aiohttp
 from typing import Optional
 import os
-from dotenv import load_dotenv
+import json
 
-load_dotenv()
+try:
+    import websockets
+except ImportError:
+    websockets = None
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -31,30 +41,45 @@ class MobileControlState:
         self.primary_ws = None
         self.current_state = {}
         self.latest_camera_frame = None
+        self.reconnect_task = None
+        self.is_connected = False
     
     async def connect_to_primary(self):
-        """Connect to primary control server via WebSocket"""
-        import websockets
-        try:
-            logger.info("Connecting to primary server...")
-            self.primary_ws = await websockets.connect(self.primary_ws_url)
-            logger.info("Connected to primary server")
+        """Connect to primary control server via WebSocket with retry logic"""
+        if websockets is None:
+            logger.error("websockets library not available")
+            return
             
-            # Subscribe to camera feed
-            await self.primary_ws.send('{"type": "subscribe_camera"}')
+        while True:
+            try:
+                logger.info(f"Connecting to primary server at {self.primary_ws_url}...")
+                self.primary_ws = await asyncio.wait_for(
+                    websockets.connect(self.primary_ws_url),
+                    timeout=10
+                )
+                self.is_connected = True
+                logger.info("✓ Connected to primary server (port 8000)")
+                
+                # Subscribe to camera feed
+                await self.primary_ws.send('{"type": "subscribe_camera"}')
+                
+                # Listen for updates
+                await self.listen_to_primary()
+                
+            except asyncio.TimeoutError:
+                logger.warning("Connection to primary server timed out, retrying in 5s...")
+            except Exception as e:
+                logger.warning(f"Failed to connect to primary server: {e}, retrying in 5s...")
             
-            # Start listening for updates
-            asyncio.create_task(self.listen_to_primary())
-        except Exception as e:
-            logger.error(f"Failed to connect to primary server: {e}")
+            self.is_connected = False
             self.primary_ws = None
+            await asyncio.sleep(5)
     
     async def listen_to_primary(self):
         """Listen for state updates from primary server"""
         try:
             while self.primary_ws:
                 message = await self.primary_ws.recv()
-                import json
                 data = json.loads(message)
                 
                 if data.get('type') == 'state':
@@ -63,19 +88,26 @@ class MobileControlState:
                 elif data.get('type') == 'camera_frame':
                     self.latest_camera_frame = data.get('frame')
                     await self.broadcast_camera_frame()
+                elif data.get('type') == 'tts_output':
+                    await self.broadcast_tts(data)
         except Exception as e:
             logger.error(f"Error listening to primary: {e}")
+            self.is_connected = False
             self.primary_ws = None
     
     async def broadcast_state(self):
         """Broadcast state to all mobile clients"""
+        disconnected = []
         for client in self.mobile_clients[:]:
             try:
                 await client.send_json({
                     'type': 'state',
                     'data': self.current_state
                 })
-            except:
+            except Exception:
+                disconnected.append(client)
+        for client in disconnected:
+            if client in self.mobile_clients:
                 self.mobile_clients.remove(client)
     
     async def broadcast_camera_frame(self):
@@ -83,22 +115,65 @@ class MobileControlState:
         if not self.latest_camera_frame:
             return
         
+        disconnected = []
         for client in self.mobile_clients[:]:
             try:
                 await client.send_json({
                     'type': 'camera_frame',
                     'frame': self.latest_camera_frame
                 })
-            except:
+            except Exception:
+                disconnected.append(client)
+        for client in disconnected:
+            if client in self.mobile_clients:
+                self.mobile_clients.remove(client)
+    
+    async def broadcast_tts(self, data: dict):
+        """Broadcast TTS to all mobile clients"""
+        disconnected = []
+        for client in self.mobile_clients[:]:
+            try:
+                await client.send_json(data)
+            except Exception:
+                disconnected.append(client)
+        for client in disconnected:
+            if client in self.mobile_clients:
                 self.mobile_clients.remove(client)
     
     async def send_command(self, command: dict):
-        """Send command to primary server"""
-        if self.primary_ws:
-            import json
-            await self.primary_ws.send(json.dumps(command))
-        else:
-            logger.warning("Not connected to primary server")
+        """Send command to primary server via WebSocket or HTTP API fallback"""
+        if self.primary_ws and self.is_connected:
+            try:
+                await self.primary_ws.send(json.dumps(command))
+                return True
+            except Exception as e:
+                logger.error(f"WebSocket send failed: {e}")
+        
+        # Fallback to HTTP API
+        try:
+            async with aiohttp.ClientSession() as session:
+                cmd_type = command.get('type')
+                
+                if cmd_type == 'emotion':
+                    # Use HTTP API for emotion changes
+                    async with session.post(
+                        f'{self.primary_server_url}/api/speak',
+                        json={'text': f"Emotion changed to {command.get('emotion', 'neutral')}"},
+                        timeout=aiohttp.ClientTimeout(total=2)
+                    ) as resp:
+                        if resp.status == 200:
+                            logger.debug(f"Emotion command sent successfully")
+                        else:
+                            logger.warning(f"Emotion command returned status {resp.status}")
+                elif cmd_type == 'start_camera' or cmd_type == 'stop_camera':
+                    logger.info(f"Camera command: {cmd_type} (WebSocket not available)")
+                elif cmd_type == 'move':
+                    logger.info(f"Move command: {command.get('direction')} (WebSocket not available)")
+                
+                return True
+        except Exception as e:
+            logger.error(f"HTTP API fallback failed: {e}")
+            return False
 
 mobile_state = MobileControlState()
 
@@ -107,12 +182,17 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     logger.info("Mobile Web Control Server starting...")
     
-    # Connect to primary server
-    await mobile_state.connect_to_primary()
+    # Start connection task in background
+    connection_task = asyncio.create_task(mobile_state.connect_to_primary())
     
     yield
     
     # Cleanup
+    connection_task.cancel()
+    try:
+        await connection_task
+    except asyncio.CancelledError:
+        pass
     if mobile_state.primary_ws:
         await mobile_state.primary_ws.close()
 
