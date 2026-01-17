@@ -895,6 +895,43 @@ async def get_status():
         'current_state': mobile_state.current_state
     }
 
+@app.post("/api/speak")
+async def speak_endpoint(data: dict):
+    """
+    Handle AI speak requests from port 3000
+    Proxies requests to primary server (port 8000) for Gemini processing
+    """
+    try:
+        text = data.get('text', '')
+        if not text:
+            return {"status": "error", "message": "No text provided"}
+        
+        logger.info(f"Speak request from port 3000: {text}")
+        
+        # Forward to primary server for Gemini processing
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f'{mobile_state.primary_server_url}/api/speak',
+                json={'text': text},
+                timeout=aiohttp.ClientTimeout(total=30)
+            ) as resp:
+                if resp.status == 200:
+                    result = await resp.json()
+                    logger.info(f"Speak request processed by port 8000")
+                    return result
+                else:
+                    error_msg = f"Primary server returned status {resp.status}"
+                    logger.error(error_msg)
+                    return {"status": "error", "message": error_msg}
+    except asyncio.TimeoutError:
+        error_msg = "Timeout waiting for primary server response"
+        logger.error(error_msg)
+        return {"status": "error", "message": error_msg}
+    except Exception as e:
+        error_msg = f"Error proxying speak request: {e}"
+        logger.error(error_msg)
+        return {"status": "error", "message": str(e)}
+
 @app.post("/api/tts")
 async def receive_tts(data: dict):
     """

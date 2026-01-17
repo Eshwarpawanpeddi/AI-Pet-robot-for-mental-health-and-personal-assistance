@@ -175,6 +175,39 @@ The system uses **three separate servers** for different purposes:
 - **Power supplies**: 5V for Pi, appropriate voltage (7-12V) for motors
 - **Optional**: Touch sensors, ultrasonic distance sensor (for future expansion)
 
+#### GPIO Pin Mappings (Raspberry Pi BCM Mode)
+
+**Motor Control Pins:**
+```
+Left Motors (Front & Rear wired in parallel):
+  - IN1: GPIO 17  (Direction control)
+  - IN2: GPIO 27  (Direction control)
+  - ENA: GPIO 22  (PWM speed control)
+
+Right Motors (Front & Rear wired in parallel):
+  - IN3: GPIO 23  (Direction control)
+  - IN4: GPIO 24  (Direction control)
+  - ENB: GPIO 25  (PWM speed control)
+```
+
+**Additional GPIO Pins:**
+```
+Audio (I2S):
+  - BCK:  GPIO 18
+  - LRCK: GPIO 20
+  - DATA: GPIO 21
+
+Touch Sensor:
+  - INPUT: GPIO 16
+```
+
+**Wiring Notes:**
+- Ensure all grounds are connected (Pi, motor drivers, power supplies)
+- Use appropriate power supply for motors (7-12V recommended)
+- Connect motor driver inputs to GPIO pins as specified above
+- Motor driver outputs connect to DC motors (OUT1/OUT2 → Left, OUT3/OUT4 → Right)
+- PWM frequency: 1kHz for smooth motor operation
+
 ### Software Requirements
 - Python 3.9+
 - Docker and Docker Compose (for server - optional)
@@ -562,19 +595,59 @@ RASPBERRY_PI_IP=192.168.1.100
 ROBOT_NAME=MyPetRobot
 ```
 
-**Important**: When accessing the servers from other devices on your network:
-1. Find your server machine's IP address (e.g., `192.168.1.100`)
-2. Set `SERVER_HOST` in `.env` to that IP address: `SERVER_HOST=192.168.1.100`
-3. Restart the servers
-4. Access the web interfaces from any device using the same IP address:
-   - Primary Control: `http://192.168.1.100:8000` (replace with your actual IP)
-   - Mobile Interface: `http://192.168.1.100:3000`
-   - Emotion Display: `http://192.168.1.100:10000`
-   - Emotion Detection: `http://192.168.1.100:9999`
+### Multi-Device Access Configuration
+
+**All servers automatically support concurrent access from multiple devices** as they bind to `0.0.0.0` (all network interfaces).
+
+**To access from different devices on your network:**
+
+1. **Find your server machine's IP address:**
+   ```bash
+   # Linux/Mac
+   hostname -I
+   # or
+   ifconfig | grep "inet "
+   
+   # Windows
+   ipconfig
+   ```
+
+2. **Set SERVER_HOST in `.env` file:**
+   ```bash
+   SERVER_HOST=192.168.1.100  # Use your actual IP address
+   ```
+
+3. **Restart all servers:**
+   ```bash
+   cd server
+   python launch_all.py
+   ```
+
+4. **Access from any device on the same network:**
+   - **Primary Control:** `http://192.168.1.100:8000` 
+   - **Mobile Interface:** `http://192.168.1.100:3000`
+   - **Emotion Display:** `http://192.168.1.100:10000`
+   - **Emotion Detection:** `http://192.168.1.100:9999`
+   
+   Replace `192.168.1.100` with your actual server IP.
+
+**Features:**
+- ✅ Multiple devices can connect simultaneously
+- ✅ Each port accepts unlimited WebSocket connections
+- ✅ Real-time synchronization across all connected devices
+- ✅ Camera stream shared across all ports
+- ✅ Gemini AI responses broadcast to all connected clients
+
+**Firewall Configuration:**
+- Ensure ports 8000, 3000, 9999, and 10000 are allowed through your firewall
+- For Linux: `sudo ufw allow 8000,3000,9999,10000/tcp`
+- For Windows: Add inbound rules for these ports in Windows Firewall
 
 ### Raspberry Pi Configuration
 
 Edit `hardware/raspberry_pi/config.yaml` to configure GPIO pins, I2C settings, and server connection.
+
+**Note:** GPIO pin mappings are documented above in the Hardware Requirements section.
 
 ### ESP12E Configuration
 
@@ -658,13 +731,56 @@ If the server shows "running" but you can't access it via IP address from other 
 ### Motors Not Moving
 
 - Check Raspberry Pi WebSocket connection status
-- Verify motor driver (L298N) connections to GPIO pins
+- Verify motor driver (L298N) connections to GPIO pins (see GPIO Pin Mappings section)
 - Check power supply voltage (7-12V) and current capacity
 - Test motors directly with power supply
-- Verify GPIO pin numbers match configuration
+- Verify GPIO pin numbers match configuration:
+  - Left: IN1=17, IN2=27, ENA=22
+  - Right: IN3=23, IN4=24, ENB=25
 - Check server logs for motor command transmission
 - Monitor Raspberry Pi logs for command receipt
-- Ensure all grounds are connected properly
+- Ensure all grounds are connected properly (Pi, motor drivers, power supplies)
+- Verify GPIO pins are in valid range (2-27 for BCM mode)
+
+### Camera Not Working or Working on One Port Only
+
+**Camera initialization issues:**
+- Verify picamera2 is installed: `pip3 install picamera2`
+- Check camera hardware connection
+- Enable camera interface: `sudo raspi-config` → Interface Options → Camera
+- Test camera: `libcamera-hello --list-cameras`
+- Check Raspberry Pi logs for camera initialization errors
+- Verify camera is not being used by another process
+
+**Camera streaming issues:**
+- Ensure Raspberry Pi is connected to primary server (port 8000)
+- Check WebSocket connection status in logs
+- Camera streams from Raspberry Pi to port 8000, then broadcasts to other ports
+- Verify `start_camera` command is being sent
+- Check for threading conflicts in logs (fixed in latest version)
+
+### Gemini AI Not Responding from Some Ports
+
+**Issue:** Gemini works on port 8000 but not on ports 3000 or 9999
+
+**Solution (Fixed):**
+- Ports 3000 and 9999 now have `/api/speak` endpoints that proxy to port 8000
+- Ensure all servers are running with latest code
+- Verify SERVER_HOST is set correctly in `.env` file
+- Check that port 8000 (primary server) has Gemini API key configured
+- Test each port:
+  ```bash
+  # Test port 8000 (primary)
+  curl -X POST http://localhost:8000/api/speak -H "Content-Type: application/json" -d '{"text":"Hello"}'
+  
+  # Test port 3000 (mobile)
+  curl -X POST http://localhost:3000/api/speak -H "Content-Type: application/json" -d '{"text":"Hello"}'
+  
+  # Test port 9999 (emotion detection)
+  curl -X POST http://localhost:9999/api/speak -H "Content-Type: application/json" -d '{"text":"Hello"}'
+  ```
+- Check server logs for proxying errors
+- TTS responses are automatically broadcast to all connected WebSocket clients on all ports
 
 ### WebSocket Connection Failed
 
