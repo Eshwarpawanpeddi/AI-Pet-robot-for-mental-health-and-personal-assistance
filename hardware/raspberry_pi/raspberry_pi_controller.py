@@ -171,9 +171,12 @@ class RaspberryPiController:
             self.pwm_motors['LEFT'] = GPIO.PWM(MOTOR_LEFT_ENA, PWM_FREQUENCY)
             self.pwm_motors['RIGHT'] = GPIO.PWM(MOTOR_RIGHT_ENB, PWM_FREQUENCY)
             
+            # Pin mapping for logging
+            pin_map = {'LEFT': MOTOR_LEFT_ENA, 'RIGHT': MOTOR_RIGHT_ENB}
+            
             for channel, pwm in self.pwm_motors.items():
                 pwm.start(0)
-                logger.info(f"{channel} motor PWM initialized on pin {MOTOR_LEFT_ENA if channel == 'LEFT' else MOTOR_RIGHT_ENB}")
+                logger.info(f"{channel} motor PWM initialized on pin {pin_map[channel]}")
             
             logger.info(f"PWM initialized at {PWM_FREQUENCY}Hz for Left/Right channels")
         except Exception as e:
@@ -244,8 +247,7 @@ class RaspberryPiController:
                     # Send to server
                     await self.websocket.send(json.dumps({
                         "type": "camera_frame",
-                        "frame": img_base64,
-                        "frame_number": frame_count
+                        "frame": img_base64
                     }))
                     
                     # Limit frame rate to ~10 FPS
