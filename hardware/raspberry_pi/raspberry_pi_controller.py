@@ -122,40 +122,71 @@ class RaspberryPiController:
         logger.info("Raspberry Pi Controller Initialized with 1-motor driver parallel setup")
     
     def _init_gpio(self):
-        """Initialize GPIO pins for single driver"""
+        """Initialize GPIO pins for single driver with validation"""
         if not self.GPIO: return
             
         GPIO = self.GPIO
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
         
-        # Setup motor control pins
+        # Validate GPIO pin numbers (BCM valid range: 2-27)
         motor_pins = [MOTOR_LEFT_IN1, MOTOR_LEFT_IN2, MOTOR_LEFT_ENA,
                       MOTOR_RIGHT_IN3, MOTOR_RIGHT_IN4, MOTOR_RIGHT_ENB]
-        GPIO.setup(motor_pins, GPIO.OUT)
+        
+        for pin in motor_pins:
+            if not (2 <= pin <= 27):
+                logger.error(f"Invalid GPIO pin number: {pin}. Must be between 2-27 (BCM mode).")
+                raise ValueError(f"Invalid GPIO pin: {pin}")
+        
+        # Setup motor control pins
+        try:
+            GPIO.setup(motor_pins, GPIO.OUT)
+            logger.info(f"Motor GPIO pins initialized: Left({MOTOR_LEFT_IN1},{MOTOR_LEFT_IN2},{MOTOR_LEFT_ENA}), Right({MOTOR_RIGHT_IN3},{MOTOR_RIGHT_IN4},{MOTOR_RIGHT_ENB})")
+        except Exception as e:
+            logger.error(f"Failed to setup motor GPIO pins: {e}")
+            raise
         
         # Audio and Touch pins
-        GPIO.setup([GPIO_I2S_BCK, GPIO_I2S_LRCK, GPIO_I2S_DATA], GPIO.OUT)
-        GPIO.setup(GPIO_TOUCH, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-        
-        logger.info("GPIO pins initialized for single-driver setup")
+        try:
+            GPIO.setup([GPIO_I2S_BCK, GPIO_I2S_LRCK, GPIO_I2S_DATA], GPIO.OUT)
+            GPIO.setup(GPIO_TOUCH, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+            logger.info(f"Audio/Touch GPIO pins initialized: I2S({GPIO_I2S_BCK},{GPIO_I2S_LRCK},{GPIO_I2S_DATA}), Touch({GPIO_TOUCH})")
+        except Exception as e:
+            logger.warning(f"Failed to setup audio/touch GPIO pins: {e}")
     
     def _init_motors(self):
-        """Initialize PWM for Left and Right channels"""
+        """Initialize PWM for Left and Right channels with validation"""
         if not self.GPIO: return
             
         GPIO = self.GPIO
-        self.pwm_motors['LEFT'] = GPIO.PWM(MOTOR_LEFT_ENA, PWM_FREQUENCY)
-        self.pwm_motors['RIGHT'] = GPIO.PWM(MOTOR_RIGHT_ENB, PWM_FREQUENCY)
         
-        for pwm in self.pwm_motors.values():
-            pwm.start(0)
+        # Validate PWM-capable pins (ENA and ENB)
+        pwm_pins = [MOTOR_LEFT_ENA, MOTOR_RIGHT_ENB]
+        for pin in pwm_pins:
+            if not (2 <= pin <= 27):
+                logger.error(f"Invalid PWM GPIO pin: {pin}")
+                raise ValueError(f"Invalid PWM GPIO pin: {pin}")
         
-        logger.info(f"PWM initialized at {PWM_FREQUENCY}Hz for Left/Right channels")
+        try:
+            self.pwm_motors['LEFT'] = GPIO.PWM(MOTOR_LEFT_ENA, PWM_FREQUENCY)
+            self.pwm_motors['RIGHT'] = GPIO.PWM(MOTOR_RIGHT_ENB, PWM_FREQUENCY)
+            
+            # Pin mapping for logging
+            pin_map = {'LEFT': MOTOR_LEFT_ENA, 'RIGHT': MOTOR_RIGHT_ENB}
+            
+            for channel, pwm in self.pwm_motors.items():
+                pwm.start(0)
+                logger.info(f"{channel} motor PWM initialized on pin {pin_map[channel]}")
+            
+            logger.info(f"PWM initialized at {PWM_FREQUENCY}Hz for Left/Right channels")
+        except Exception as e:
+            logger.error(f"Failed to initialize PWM: {e}")
+            raise
     
     def _init_camera(self):
-        """Initialize Pi camera"""
+        """Initialize Pi camera with detailed logging"""
         try:
+            logger.info("Attempting to initialize camera...")
             from picamera2 import Picamera2
             self.camera = Picamera2()
             config = self.camera.create_preview_configuration(
@@ -163,29 +194,45 @@ class RaspberryPiController:
             )
             self.camera.configure(config)
             self.camera_enabled = True
-            logger.info("Camera initialized successfully")
-        except ImportError:
-            logger.warning("picamera2 not available - camera features disabled")
+            logger.info("✓ Camera initialized successfully (640x480, RGB888)")
+        except ImportError as e:
+            logger.warning(f"picamera2 not available - camera features disabled: {e}")
             self.camera_enabled = False
+            self.camera = None
+        except RuntimeError as e:
+            logger.error(f"Camera hardware error - check connection: {e}")
+            self.camera_enabled = False
+            self.camera = None
         except Exception as e:
-            logger.error(f"Failed to initialize camera: {e}")
+            logger.error(f"Failed to initialize camera: {type(e).__name__}: {e}")
             self.camera_enabled = False
+            self.camera = None
     
     async def start_camera_stream(self):
-        """Start streaming camera frames to server"""
+        """Start streaming camera frames to server with thread safety"""
         if not self.camera_enabled or not self.camera:
             logger.warning("Camera not available for streaming")
             return
         
+        # Prevent multiple streaming sessions
+        if self.camera_streaming:
+            logger.warning("Camera streaming already active")
+            return
+        
         self.camera_streaming = True
+        camera_started = False
+        
         try:
             self.camera.start()
-            logger.info("Camera streaming started")
+            camera_started = True
+            logger.info("✓ Camera streaming started (10 FPS, JPEG quality 70)")
             
+            frame_count = 0
             while self.camera_streaming and self.websocket:
                 try:
                     # Capture frame
                     frame = self.camera.capture_array()
+                    frame_count += 1
                     
                     # Convert to JPEG
                     from PIL import Image
@@ -206,19 +253,23 @@ class RaspberryPiController:
                     # Limit frame rate to ~10 FPS
                     await asyncio.sleep(0.1)
                     
+                except asyncio.CancelledError:
+                    logger.info("Camera streaming task cancelled")
+                    break
                 except Exception as e:
-                    logger.error(f"Error streaming camera frame: {e}")
+                    logger.error(f"Error streaming camera frame #{frame_count}: {e}")
                     await asyncio.sleep(1)
                     
         except Exception as e:
             logger.error(f"Camera streaming error: {e}")
         finally:
-            if self.camera:
+            if camera_started and self.camera:
                 try:
                     self.camera.stop()
-                except:
-                    pass
-            logger.info("Camera streaming stopped")
+                    logger.info(f"Camera streaming stopped (streamed {frame_count} frames)")
+                except Exception as e:
+                    logger.warning(f"Error stopping camera: {e}")
+            self.camera_streaming = False
     
     async def stop_camera_stream(self):
         """Stop camera streaming"""
