@@ -841,6 +841,8 @@ This project is open source and available under the MIT License.
 ## 👥 Authors
 
 - Eshwar Pawan Peddi
+- Shruthi T R
+- Chirag S G Reddy
 
 ## 🙏 Acknowledgments
 
